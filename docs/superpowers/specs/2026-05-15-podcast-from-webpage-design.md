@@ -14,7 +14,6 @@
 
 - 不做 monologue / 文章式输出（v1 只生成对话）
 - 不做 JS 渲染抓取 / 无头浏览器（v1 只支持静态 HTML）
-- 不做付费墙绕过、登录页抓取、私有 GitHub 仓库
 - 不做 URL 缓存 / 历史记录（每次重新抓）
 - 不做内容审核 / 版权检查
 - 不做 PDF / YouTube / RSS 等其他来源（模块结构留接口，将来扩展）
@@ -293,11 +292,11 @@ URL 必须是 http/https（Pydantic 校验）。
 
 ### 错误码
 
-| 码 | 场景 |
-|---|---|
-| 400 | URL 格式非法 / 协议非 http(s) / 必填缺失 |
-| 404 | GET 不存在的 generation id |
-| 422 | 抽取出的正文为空 / 过短 |
+| 码  | 场景                                                     |
+| --- | -------------------------------------------------------- |
+| 400 | URL 格式非法 / 协议非 http(s) / 必填缺失                 |
+| 404 | GET 不存在的 generation id                               |
+| 422 | 抽取出的正文为空 / 过短                                  |
 | 502 | 抓取超时 / 抓取返回非 2xx（在 job error_message 中展示） |
 
 ### 模块边界
@@ -316,15 +315,15 @@ URL 必须是 http/https（Pydantic 校验）。
 
 ### 异步阶段（Job 失败，session 保留）
 
-| 失败点 | 触发条件 | 处理 |
-|---|---|---|
-| 抓取超时 | HTTP 请求 > 15s | status=failed，error_message="抓取超时" |
-| HTTP 非 2xx | 返回 4xx/5xx | status=failed，error_message 含状态码 |
-| Body 过大 | 响应 > 5MB | 抓取截断，meta.body_truncated=true，继续抽取 |
-| 非 HTML 内容 | content-type 不是 text/html 或 text/plain | status=failed，error_message="不支持的内容类型: <type>" |
-| 无可读正文 | 抽取出文本 < 200 字符 | status=failed，error_message="未抽取到可读正文" |
-| 正文过长 | > 50,000 字符 | 截断为 50K（前 45K + 末 5K，中间放占位符），meta.truncated=true，不算失败 |
-| script 生成失败 | 下游 LLM 报错 | material_generation.status=failed，error 透传，session 保留 |
+| 失败点          | 触发条件                                  | 处理                                                                      |
+| --------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
+| 抓取超时        | HTTP 请求 > 15s                           | status=failed，error_message="抓取超时"                                   |
+| HTTP 非 2xx     | 返回 4xx/5xx                              | status=failed，error_message 含状态码                                     |
+| Body 过大       | 响应 > 5MB                                | 抓取截断，meta.body_truncated=true，继续抽取                              |
+| 非 HTML 内容    | content-type 不是 text/html 或 text/plain | status=failed，error_message="不支持的内容类型: <type>"                   |
+| 无可读正文      | 抽取出文本 < 200 字符                     | status=failed，error_message="未抽取到可读正文"                           |
+| 正文过长        | > 50,000 字符                             | 截断为 50K（前 45K + 末 5K，中间放占位符），meta.truncated=true，不算失败 |
+| script 生成失败 | 下游 LLM 报错                             | material_generation.status=failed，error 透传，session 保留               |
 
 ### 关键决策
 
