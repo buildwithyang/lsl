@@ -21,6 +21,7 @@ class ScriptGenerationModel(Base):
     session_id: Mapped[str] = mapped_column(UUIDHexString(), nullable=False)
     transcript_id: Mapped[str | None] = mapped_column(UUIDHexString(), nullable=True)
     job_id: Mapped[str | None] = mapped_column(UUIDHexString(), nullable=True)
+    material_generation_id: Mapped[str | None] = mapped_column(UUIDHexString(), nullable=True)
     provider: Mapped[str] = mapped_column("x_provider", String(32), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column("x_description", Text, nullable=True)
