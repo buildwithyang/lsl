@@ -140,7 +140,7 @@ LSL 的宗旨是：学习语言应该是 `listening -> speak -> listening`。先
 当前项目使用 `uv pip install` 安装 Python 依赖。后端原型至少需要：
 
 ```bash
-uv pip install fastapi uvicorn pydantic sqlalchemy python-dotenv requests httpx openai json-repair redis alibabacloud-oss-v2
+uv pip install fastapi uvicorn pydantic sqlalchemy python-dotenv requests httpx openai json-repair redis alibabacloud-oss-v2 trafilatura
 ```
 
 说明：
@@ -149,6 +149,7 @@ uv pip install fastapi uvicorn pydantic sqlalchemy python-dotenv requests httpx 
 - 本地开发默认已经切到 `SQLite`，不再要求先起 `PostgreSQL`。
 - 如果你仍然要接 `PostgreSQL`，再额外安装 `psycopg[binary]` 和 `psycopg-pool`。
 - 如果本地已经有 `uv` 管理的虚拟环境，直接在对应环境里执行即可。
+- `trafilatura` 用于把任意 HTML 网页抽取出干净的正文，是播客功能的基础依赖。
 
 ### 2. 配置 `.env`
 

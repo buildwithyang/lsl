@@ -128,7 +128,7 @@ Note: most module design docs are currently written in Chinese.
 This project currently uses `uv pip install` for Python dependencies. The backend prototype needs at least:
 
 ```bash
-uv pip install fastapi uvicorn pydantic sqlalchemy python-dotenv requests httpx openai json-repair redis alibabacloud-oss-v2
+uv pip install fastapi uvicorn pydantic sqlalchemy python-dotenv requests httpx openai json-repair redis alibabacloud-oss-v2 trafilatura
 ```
 
 Notes:
@@ -137,6 +137,7 @@ Notes:
 - Local development now defaults to `SQLite`, so `PostgreSQL` is no longer required just to start the app.
 - If you still want `PostgreSQL`, install `psycopg[binary]` and `psycopg-pool` as well.
 - If you already have a `uv`-managed virtual environment, run the command inside that environment.
+- `trafilatura` is used to extract main text from arbitrary HTML pages for the podcast feature.
 
 ### 2. Configure `.env`
 
