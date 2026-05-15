@@ -41,6 +41,7 @@ class ScriptRepository:
         difficulty: str | None,
         cue_style: str | None,
         must_include: list[str],
+        material_generation_id: str | None = None,
     ) -> dict[str, Any]:
         model = ScriptGenerationModel(
             generation_id=self._require_uuid(generation_id, field_name="generation_id"),
@@ -57,6 +58,11 @@ class ScriptRepository:
             cue_style=cue_style,
             must_include_json=list(must_include),
             status=int(ScriptGenerationStatus.PENDING),
+            material_generation_id=(
+                self._require_uuid(material_generation_id, field_name="material_generation_id")
+                if material_generation_id
+                else None
+            ),
         )
         try:
             with self._session_scope() as db:
@@ -211,6 +217,7 @@ class ScriptRepository:
             "session_id": model.session_id,
             "transcript_id": model.transcript_id,
             "job_id": model.job_id,
+            "material_generation_id": model.material_generation_id,
             "provider": model.provider,
             "title": model.title,
             "description": model.description,

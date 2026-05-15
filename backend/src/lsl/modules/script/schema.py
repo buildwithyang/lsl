@@ -95,6 +95,7 @@ class ScriptGenerationData(BaseModel):
     session_id: str
     transcript_id: str | None = None
     job_id: str | None = None
+    material_generation_id: str | None = None
     provider: str
     title: str
     description: str | None = None
