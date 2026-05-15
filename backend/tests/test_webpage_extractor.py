@@ -63,3 +63,31 @@ def test_extract_truncates_long_content():
     assert len(result.main_text) <= 1000
     assert result.meta.get("truncated") is True
     assert "[... omitted ...]" in result.main_text
+
+
+from lsl.core.config import Settings
+from lsl.modules.material.extractor.factory import build_extractor
+
+
+def _settings_with_material_defaults():
+    return Settings(
+        MATERIAL_WEBPAGE_TIMEOUT_SECONDS=15.0,
+        MATERIAL_WEBPAGE_MAX_BODY_BYTES=5_000_000,
+        MATERIAL_EXTRACTED_TEXT_MAX_CHARS=50_000,
+    )
+
+
+def test_factory_returns_webpage_extractor_for_webpage_input():
+    extractor = build_extractor(
+        WebpageSourceInput(type="webpage", url="https://example.com"),
+        settings=_settings_with_material_defaults(),
+    )
+    assert isinstance(extractor, WebpageExtractor)
+
+
+def test_factory_raises_for_unknown_type():
+    class FakeInput:
+        type = "pdf"
+
+    with pytest.raises(ValueError):
+        build_extractor(FakeInput(), settings=_settings_with_material_defaults())

@@ -142,6 +142,14 @@ class Settings:
     # Script LLM HTTP 超时时间，单位秒。
     SCRIPT_LLM_HTTP_TIMEOUT: float = 90.0
 
+    # Material / Webpage extractor
+    # 单次抓取 HTTP 超时，秒。
+    MATERIAL_WEBPAGE_TIMEOUT_SECONDS: float = 15.0
+    # 响应 Body 最大字节数，超过则截断。
+    MATERIAL_WEBPAGE_MAX_BODY_BYTES: int = 5 * 1024 * 1024
+    # 抽取出的正文最大字符数，超过则按 head+tail 截断。
+    MATERIAL_EXTRACTED_TEXT_MAX_CHARS: int = 50_000
+
     # Translation provider。本地联调用 fake；真实翻译使用 llm。
     TRANSLATION_PROVIDER: str = "fake"
     # Translation LLM API Key；未配置时复用 Revision LLM API Key。
@@ -211,6 +219,18 @@ class Settings:
         script_llm_http_timeout = _get_env_float(
             "SCRIPT_LLM_HTTP_TIMEOUT",
             cls.SCRIPT_LLM_HTTP_TIMEOUT,
+        )
+        material_webpage_timeout_seconds = _get_env_float(
+            "MATERIAL_WEBPAGE_TIMEOUT_SECONDS",
+            cls.MATERIAL_WEBPAGE_TIMEOUT_SECONDS,
+        )
+        material_webpage_max_body_bytes = _get_env_int(
+            "MATERIAL_WEBPAGE_MAX_BODY_BYTES",
+            cls.MATERIAL_WEBPAGE_MAX_BODY_BYTES,
+        )
+        material_extracted_text_max_chars = _get_env_int(
+            "MATERIAL_EXTRACTED_TEXT_MAX_CHARS",
+            cls.MATERIAL_EXTRACTED_TEXT_MAX_CHARS,
         )
         translation_llm_http_timeout = _get_env_float(
             "TRANSLATION_LLM_HTTP_TIMEOUT",
@@ -324,6 +344,9 @@ class Settings:
             SCRIPT_LLM_BASE_URL=script_llm_base_url,
             SCRIPT_LLM_MODEL=script_llm_model,
             SCRIPT_LLM_HTTP_TIMEOUT=script_llm_http_timeout,
+            MATERIAL_WEBPAGE_TIMEOUT_SECONDS=material_webpage_timeout_seconds,
+            MATERIAL_WEBPAGE_MAX_BODY_BYTES=material_webpage_max_body_bytes,
+            MATERIAL_EXTRACTED_TEXT_MAX_CHARS=material_extracted_text_max_chars,
             TRANSLATION_PROVIDER=translation_provider,
             TRANSLATION_LLM_API_KEY=translation_llm_api_key,
             TRANSLATION_LLM_BASE_URL=translation_llm_base_url,
