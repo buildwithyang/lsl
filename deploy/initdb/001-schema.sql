@@ -289,6 +289,7 @@ CREATE TABLE IF NOT EXISTS public.script_generations (
     session_id         VARCHAR(32) NOT NULL,                       -- Created text session id.
     transcript_id      VARCHAR(32),                                -- Completed transcript id.
     job_id             VARCHAR(32),                                -- Async job id.
+    material_generation_id VARCHAR(32),                            -- Source material generation id when produced from the material/podcast flow; NULL for direct AI script flow.
     x_provider         VARCHAR(32) NOT NULL,                       -- Script generator provider.
     title              VARCHAR(200) NOT NULL,                      -- Requested session title.
     x_description      TEXT,                                       -- Requested session description.
@@ -321,6 +322,37 @@ CREATE INDEX IF NOT EXISTS idx_script_generations_transcript_id
 -- List script generations by lifecycle state.
 CREATE INDEX IF NOT EXISTS idx_script_generations_status_created_at
     ON public.script_generations (x_status, created_at);
+
+-- ---------------------------------------------------------------------------
+-- Material module
+-- Tracks external-source content extraction (v1: webpage). Output feeds the
+-- script module which produces the actual dialogue transcript and revision.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.material_generations (
+    generation_id        VARCHAR(32) PRIMARY KEY,                  -- Material generation id, uuid hex.
+    session_id           VARCHAR(32) NOT NULL,                     -- Created text session id.
+    x_source_type        VARCHAR(32) NOT NULL,                     -- Source type, currently 'webpage'.
+    source_payload_json  TEXT NOT NULL DEFAULT '{}',               -- Original source descriptor JSON, e.g. {"url": "..."}.
+    extracted_title      VARCHAR(500),                             -- Title extracted from the source.
+    extracted_text       TEXT,                                     -- Main text extracted from the source.
+    extracted_meta_json  TEXT,                                     -- Extra extraction metadata JSON (truncated flag, etc.).
+    script_generation_id VARCHAR(32),                              -- Downstream script generation id once chained.
+    job_id               VARCHAR(32),                              -- Async job id (job_type=script_from_material).
+    x_status             SMALLINT NOT NULL DEFAULT 0,              -- 0 pending, 1 extracting, 2 extracted, 3 completed, 4 failed.
+    error_code           VARCHAR(64),                              -- Stable failure code.
+    error_message        TEXT,                                     -- Failure detail.
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Creation timestamp.
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP  -- Last update timestamp.
+);
+
+-- List material generations by session.
+CREATE INDEX IF NOT EXISTS idx_material_generations_session_id
+    ON public.material_generations (session_id);
+
+-- List material generations by lifecycle state.
+CREATE INDEX IF NOT EXISTS idx_material_generations_status_created_at
+    ON public.material_generations (x_status, created_at);
 
 -- ---------------------------------------------------------------------------
 -- Translation module
@@ -463,6 +495,7 @@ DROP TRIGGER IF EXISTS trg_session_sessions_set_updated_at ON public.session_ses
 DROP TRIGGER IF EXISTS trg_revision_revisions_set_updated_at ON public.revision_revisions;
 DROP TRIGGER IF EXISTS trg_revision_items_set_updated_at ON public.revision_items;
 DROP TRIGGER IF EXISTS trg_script_generations_set_updated_at ON public.script_generations;
+DROP TRIGGER IF EXISTS trg_material_generations_set_updated_at ON public.material_generations;
 DROP TRIGGER IF EXISTS trg_translation_translations_set_updated_at ON public.translation_translations;
 DROP TRIGGER IF EXISTS trg_translation_items_set_updated_at ON public.translation_items;
 DROP TRIGGER IF EXISTS trg_tts_session_settings_set_updated_at ON public.tts_session_settings;
@@ -514,6 +547,12 @@ EXECUTE FUNCTION public.set_updated_at();
 -- Keep script generation update timestamps current.
 CREATE TRIGGER trg_script_generations_set_updated_at
 BEFORE UPDATE ON public.script_generations
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+-- Keep material generation update timestamps current.
+CREATE TRIGGER trg_material_generations_set_updated_at
+BEFORE UPDATE ON public.material_generations
 FOR EACH ROW
 EXECUTE FUNCTION public.set_updated_at();
 
