@@ -31,14 +31,14 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
 
   const [url, setUrl] = useState('');
   const [sessionName, setSessionName] = useState('');
-  const [sessionDescription, setSessionDescription] = useState('');
+  const sessionDescription = '';
   const [targetLanguage, setTargetLanguage] = useState('en-US');
   const [steeringPrompt, setSteeringPrompt] = useState('');
-  const [turnCount, setTurnCount] = useState('8');
-  const [speakerCount, setSpeakerCount] = useState('2');
-  const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
-  const [cueStyle, setCueStyle] = useState(() => t('create.defaultCueStyle'));
-  const [mustInclude, setMustInclude] = useState('');
+  const turnCount = '8';
+  const speakerCount = '2';
+  const difficulty: Difficulty = 'Beginner';
+  const cueStyle = t('create.defaultCueStyle');
+  const mustInclude = '';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
