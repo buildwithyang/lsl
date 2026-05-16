@@ -26,6 +26,8 @@ from lsl.modules.revision import RevisionJobHandler, RevisionRepository, Revisio
 from lsl.modules.revision.api import router as revision_router
 from lsl.modules.script import ScriptJobHandler, ScriptRepository, ScriptService, create_script_generator
 from lsl.modules.script.api import router as script_router
+from lsl.modules.material import MaterialJobHandler, MaterialRepository, MaterialService, build_extractor
+from lsl.modules.material.api import router as material_router
 from lsl.modules.session import SessionRepository, SessionService
 from lsl.modules.session.api import router as session_router
 from lsl.modules.transcript import TranscriptRepository, TranscriptService
@@ -177,6 +179,11 @@ async def lifespan(app: FastAPI):
         if db_resources.session_factory is not None
         else None
     )
+    material_repository = (
+        MaterialRepository(db_resources.session_factory)
+        if db_resources.session_factory is not None
+        else None
+    )
     user_repository = (
         UserRepository(db_resources.session_factory)
         if db_resources.session_factory is not None
@@ -278,6 +285,20 @@ async def lifespan(app: FastAPI):
         and job_service is not None
         else None
     )
+    material_service = (
+        MaterialService(
+            repository=material_repository,
+            session_service=session_service,
+            script_service=script_service,
+            job_service=job_service,
+            extractor_factory=lambda payload: build_extractor(payload, settings=settings),
+        )
+        if material_repository is not None
+        and session_service is not None
+        and script_service is not None
+        and job_service is not None
+        else None
+    )
     auth_service = AuthService(settings=settings, repository=user_repository)
 
     if job_service is not None:
@@ -285,6 +306,8 @@ async def lifespan(app: FastAPI):
             job_service.register_handler(AsrJobHandler(asr_service=asr_service))
         if script_service is not None:
             job_service.register_handler(ScriptJobHandler(script_service=script_service))
+        if material_service is not None:
+            job_service.register_handler(MaterialJobHandler(material_service=material_service))
         if revision_service is not None:
             # Revision job flow 4/5: register the handler that consumes revision_generation jobs.
             job_service.register_handler(RevisionJobHandler(revision_service=revision_service))
@@ -311,6 +334,7 @@ async def lifespan(app: FastAPI):
     app.state.translation_service = translation_service
     app.state.tts_service = tts_service
     app.state.script_service = script_service
+    app.state.material_service = material_service
 
     try:
         yield
@@ -346,6 +370,7 @@ app.include_router(script_router, dependencies=protected_router_dependencies)
 app.include_router(revision_router, dependencies=protected_router_dependencies)
 app.include_router(translation_router, dependencies=protected_router_dependencies)
 app.include_router(tts_router, dependencies=protected_router_dependencies)
+app.include_router(material_router, dependencies=protected_router_dependencies)
 
 
 @app.get("/health", response_model=ApiResponse[HealthData])
