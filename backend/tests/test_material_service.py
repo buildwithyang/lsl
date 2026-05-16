@@ -128,3 +128,25 @@ def test_create_from_url_creates_session_generation_and_job(services):
     assert data.material_generation.status_name == "pending"
     assert data.material_generation.source_payload == {"url": "https://example.com/cats"}
     assert data.job.job_id
+
+
+def test_run_material_job_extracts_then_chains_to_script(services):
+    material_service, job_service, _extractor = services
+    req = GenerateMaterialSessionRequest.model_validate(
+        {
+            "source": {"type": "webpage", "url": "https://example.com/cats"},
+            "target_language": "en-US",
+            "title": "Cat care",
+        }
+    )
+    data = material_service.create_from_url(req)
+
+    # Drive the job runner manually (synchronous claim + run).
+    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
+    for job in jobs:
+        job_service.run_claimed_job(job)
+
+    refreshed = material_service.get_generation(generation_id=data.material_generation.generation_id)
+    assert refreshed.status_name == "completed"
+    assert refreshed.script_generation_id is not None
+    assert refreshed.extracted_title == "The Cat Care Guide"

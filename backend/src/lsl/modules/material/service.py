@@ -87,7 +87,116 @@ class MaterialService:
         return MaterialGenerationData.from_row(row)
 
     def run_material_job(self, *, generation_id: str, request_payload: dict) -> JobRunResult:
-        raise NotImplementedError("run_material_job is implemented in Task 11")
+        row = self._repository.get_by_id(generation_id)
+        if row is None:
+            return JobRunResult(
+                status=JobStatus.FAILED,
+                error_code="MATERIAL_GENERATION_NOT_FOUND",
+                error_message="material generation not found",
+            )
+        if row["status_name"] == "completed":
+            return JobRunResult(status=JobStatus.COMPLETED, progress=100)
+
+        self._repository.mark_extracting(generation_id=generation_id)
+        try:
+            source_input = self._build_source_input(row["source_type"], row["source_payload"])
+            extractor = self._extractor_factory(source_input)
+            extracted: ExtractedContent = extractor.extract(source_input)
+        except Exception as exc:
+            logger.exception("Material extraction failed generation_id=%s", generation_id)
+            self._repository.mark_failed(
+                generation_id=generation_id,
+                error_code="EXTRACTION_FAILED",
+                error_message=str(exc),
+            )
+            return JobRunResult(status=JobStatus.FAILED, error_code="EXTRACTION_FAILED", error_message=str(exc))
+
+        if len(extracted.main_text or "") < _MIN_EXTRACTED_TEXT_CHARS:
+            message = "Extracted content is empty or too short"
+            self._repository.mark_failed(
+                generation_id=generation_id,
+                error_code="EXTRACTION_EMPTY",
+                error_message=message,
+            )
+            return JobRunResult(status=JobStatus.FAILED, error_code="EXTRACTION_EMPTY", error_message=message)
+
+        self._repository.mark_extracted(
+            generation_id=generation_id,
+            title=extracted.title,
+            text=extracted.main_text,
+            meta=extracted.meta,
+        )
+        if extracted.title:
+            self._session_service.update_session(
+                session_id=row["session_id"],
+                payload=UpdateSessionRequest(
+                    title=extracted.title,
+                    description=request_payload.get("description"),
+                    target_language=request_payload.get("target_language"),
+                    f_type=2,
+                ),
+            )
+
+        prompt = self._build_prompt(
+            extracted=extracted,
+            user_steering=request_payload.get("prompt"),
+        )
+
+        try:
+            script_generation, _job = self._script_service.start_generation_from_material(
+                session_id=row["session_id"],
+                material_generation_id=generation_id,
+                title=extracted.title or request_payload.get("title") or _DEFAULT_TITLE,
+                description=request_payload.get("description"),
+                target_language=request_payload.get("target_language"),
+                cue_language=request_payload.get("cue_language"),
+                prompt=prompt,
+                turn_count=int(request_payload.get("turn_count") or 8),
+                speaker_count=int(request_payload.get("speaker_count") or 2),
+                difficulty=request_payload.get("difficulty"),
+                cue_style=request_payload.get("cue_style"),
+                must_include=list(request_payload.get("must_include") or []),
+            )
+        except Exception as exc:
+            logger.exception("Script-from-material chain failed generation_id=%s", generation_id)
+            self._repository.mark_failed(
+                generation_id=generation_id,
+                error_code="SCRIPT_GENERATION_FAILED",
+                error_message=str(exc),
+            )
+            return JobRunResult(status=JobStatus.FAILED, error_code="SCRIPT_GENERATION_FAILED", error_message=str(exc))
+
+        self._repository.set_script_generation_id(
+            generation_id=generation_id,
+            script_generation_id=script_generation.generation_id,
+        )
+        self._repository.mark_completed(generation_id=generation_id)
+        logger.info(
+            "Material job completed generation_id=%s script_generation_id=%s",
+            generation_id,
+            script_generation.generation_id,
+        )
+        return JobRunResult(status=JobStatus.COMPLETED, progress=100)
+
+    @staticmethod
+    def _build_source_input(source_type: str, payload: dict):
+        if source_type == "webpage":
+            return WebpageSourceInput(type="webpage", url=payload.get("url"))
+        raise ValueError(f"Unsupported source type: {source_type!r}")
+
+    @staticmethod
+    def _build_prompt(*, extracted: ExtractedContent, user_steering: str | None) -> str:
+        parts: list[str] = []
+        if extracted.title:
+            parts.append(f"Webpage title: {extracted.title}")
+        if extracted.canonical_url:
+            parts.append(f"Source URL: {extracted.canonical_url}")
+        parts.append("Generate a two-host podcast-style dialogue that discusses the content below.")
+        if user_steering:
+            parts.append(f"Additional instructions: {user_steering}")
+        parts.append("Webpage content:")
+        parts.append(extracted.main_text)
+        return "\n\n".join(parts)
 
     @staticmethod
     def _source_to_payload(source) -> dict[str, str]:
