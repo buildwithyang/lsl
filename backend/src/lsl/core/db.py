@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session as OrmSession, sessionmaker
 
 from lsl.core.config import Settings
@@ -12,6 +13,8 @@ from lsl.core.config import Settings
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool
     from sqlalchemy.engine import Engine
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -77,11 +80,54 @@ def create_database_resources(settings: Settings) -> DatabaseResources:
         expire_on_commit=False,
     )
     Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
     return DatabaseResources(
         pool=connect_pool,
         engine=engine,
         session_factory=session_factory,
     )
+
+
+def _add_missing_columns(engine: Engine) -> None:
+    """ALTER TABLE ADD COLUMN for any new nullable columns added to models.
+
+    `Base.metadata.create_all()` only creates tables that don't exist; it never
+    alters existing tables. When a column is added to a SQLAlchemy model, this
+    helper adds the corresponding column on next startup so existing databases
+    stay in sync without manual migrations.
+
+    Safety: only adds NULLABLE columns. NOT NULL columns require manual
+    migration (a default would be ambiguous), so they're skipped with a warning.
+    Never drops or modifies existing columns.
+    """
+    inspector = inspect(engine)
+    dialect = engine.dialect
+    existing_tables = set(inspector.get_table_names())
+
+    with engine.begin() as conn:
+        for table_name, table in Base.metadata.tables.items():
+            if table_name not in existing_tables:
+                continue
+            actual_cols = {col["name"] for col in inspector.get_columns(table_name)}
+            for column in table.columns:
+                if column.name in actual_cols:
+                    continue
+                if not column.nullable:
+                    logger.warning(
+                        "Skipping ALTER TABLE %s ADD COLUMN %s: column is NOT NULL "
+                        "and requires a manual migration.",
+                        table_name,
+                        column.name,
+                    )
+                    continue
+                column_type = column.type.compile(dialect=dialect)
+                conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN {column.name} {column_type}'))
+                logger.info(
+                    "Added missing column %s.%s (%s) via auto-migration",
+                    table_name,
+                    column.name,
+                    column_type,
+                )
 
 
 def close_database_resources(resources: DatabaseResources) -> None:
