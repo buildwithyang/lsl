@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import httpx
 import trafilatura
 
 from lsl.modules.material.extractor.base import ExtractedContent, WebpageSourceInput
@@ -61,7 +62,52 @@ class WebpageExtractor:
         )
 
     def _fetch_html(self, url: str) -> str | None:
-        return trafilatura.fetch_url(url)
+        try:
+            with httpx.Client(
+                follow_redirects=True,
+                timeout=self._timeout_seconds,
+            ) as client:
+                with client.stream("GET", url) as response:
+                    if response.status_code >= 400:
+                        logger.warning(
+                            "Webpage fetch returned HTTP %s for url=%s",
+                            response.status_code,
+                            url,
+                        )
+                        return None
+                    content_type = response.headers.get("content-type", "")
+                    if content_type and not (
+                        content_type.startswith("text/html")
+                        or content_type.startswith("text/plain")
+                        or content_type.startswith("application/xhtml")
+                    ):
+                        logger.warning(
+                            "Webpage fetch returned unsupported content-type=%s url=%s",
+                            content_type,
+                            url,
+                        )
+                        return None
+                    chunks: list[bytes] = []
+                    total = 0
+                    for chunk in response.iter_bytes(chunk_size=64 * 1024):
+                        total += len(chunk)
+                        if total > self._max_body_bytes:
+                            logger.info(
+                                "Webpage fetch truncated at %s bytes url=%s",
+                                self._max_body_bytes,
+                                url,
+                            )
+                            break
+                        chunks.append(chunk)
+                    body = b"".join(chunks)
+                    encoding = response.encoding or "utf-8"
+                    try:
+                        return body.decode(encoding, errors="replace")
+                    except (LookupError, UnicodeDecodeError):
+                        return body.decode("utf-8", errors="replace")
+        except httpx.HTTPError as exc:
+            logger.warning("Webpage fetch failed url=%s error=%s", url, exc)
+            return None
 
     def _extract_title(self, html: str) -> str | None:
         try:
