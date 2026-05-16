@@ -150,3 +150,36 @@ def test_run_material_job_extracts_then_chains_to_script(services):
     assert refreshed.status_name == "completed"
     assert refreshed.script_generation_id is not None
     assert refreshed.extracted_title == "The Cat Care Guide"
+
+
+def test_run_material_job_marks_failed_on_extractor_exception(services):
+    material_service, job_service, extractor = services
+    extractor._exc = RuntimeError("boom")
+    req = GenerateMaterialSessionRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/cats"}, "target_language": "en-US"}
+    )
+    data = material_service.create_from_url(req)
+    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
+    for job in jobs:
+        job_service.run_claimed_job(job)
+
+    refreshed = material_service.get_generation(generation_id=data.material_generation.generation_id)
+    assert refreshed.status_name == "failed"
+    assert refreshed.error_code == "EXTRACTION_FAILED"
+    assert "boom" in (refreshed.error_message or "")
+
+
+def test_run_material_job_marks_failed_when_text_too_short(services):
+    material_service, job_service, extractor = services
+    extractor._result = ExtractedContent(title="Tiny", main_text="Short", canonical_url="https://example.com/x")
+    req = GenerateMaterialSessionRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/x"}, "target_language": "en-US"}
+    )
+    data = material_service.create_from_url(req)
+    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
+    for job in jobs:
+        job_service.run_claimed_job(job)
+
+    refreshed = material_service.get_generation(generation_id=data.material_generation.generation_id)
+    assert refreshed.status_name == "failed"
+    assert refreshed.error_code == "EXTRACTION_EMPTY"
