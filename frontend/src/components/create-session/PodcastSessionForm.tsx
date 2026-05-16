@@ -89,7 +89,7 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
       });
       const session = mapSessionItem(result.session);
       dispatch({ type: 'ADD_SESSION', payload: session });
-      navigate(`/sessions/${session.id}`);
+      navigate(`/session/${session.id}`);
     } catch (err) {
       console.error('Failed to create podcast session', err);
       setErrors({ submit: String(err) });
