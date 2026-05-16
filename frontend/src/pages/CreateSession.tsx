@@ -1,16 +1,17 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Mic, Sparkles } from 'lucide-react';
+import { ArrowLeft, Mic, Sparkles, Headphones } from 'lucide-react';
 import { AudioSessionForm } from '@/components/create-session/AudioSessionForm';
 import { AiScriptSessionForm } from '@/components/create-session/AiScriptSessionForm';
+import { PodcastSessionForm } from '@/components/create-session/PodcastSessionForm';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 
 export function CreateSession() {
   const { t } = useI18n();
-  const [mode, setMode] = useState<'audio' | 'ai_script'>('ai_script');
+  const [mode, setMode] = useState<'audio' | 'ai_script' | 'podcast'>('podcast');
 
-  const handleModeChange = useCallback((nextMode: 'audio' | 'ai_script') => {
+  const handleModeChange = useCallback((nextMode: 'audio' | 'ai_script' | 'podcast') => {
     setMode(nextMode);
   }, []);
 
@@ -48,10 +49,22 @@ export function CreateSession() {
         >
           <Sparkles className="h-4 w-4" /> {t('create.aiScript')}
         </button>
+        <button
+          onClick={() => handleModeChange('podcast')}
+          className={cn(
+            'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-medium transition-all duration-200',
+            mode === 'podcast'
+              ? 'bg-white text-slate-800 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          )}
+        >
+          <Headphones className="h-4 w-4" /> {t('create.podcast')}
+        </button>
       </div>
 
       <AudioSessionForm active={mode === 'audio'} />
       <AiScriptSessionForm active={mode === 'ai_script'} />
+      <PodcastSessionForm active={mode === 'podcast'} />
     </div>
   );
 }
