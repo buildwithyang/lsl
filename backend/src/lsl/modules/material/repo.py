@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import sessionmaker
 
 from lsl.modules.material.model import MaterialGenerationModel
-from lsl.modules.material.types import MaterialGenerationStatus, material_generation_status_to_name
+from lsl.modules.material.schema import MaterialGenerationData
+from lsl.modules.material.types import MaterialGenerationStatus
 
 
 class MaterialRepository:
@@ -33,7 +34,7 @@ class MaterialRepository:
         source_type: str,
         source_payload: dict[str, Any],
         request_payload: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> MaterialGenerationData:
         model = MaterialGenerationModel(
             generation_id=self._require_uuid(generation_id, "generation_id"),
             session_id=self._require_uuid(session_id, "session_id"),
@@ -47,7 +48,7 @@ class MaterialRepository:
                 db.add(model)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return MaterialGenerationData.model_validate(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to create material generation: {exc}") from exc
 
@@ -57,16 +58,16 @@ class MaterialRepository:
             model.job_id = self._require_uuid(job_id, "job_id")
             db.commit()
 
-    def get_by_id(self, generation_id: str) -> dict[str, Any] | None:
+    def get_by_id(self, generation_id: str) -> MaterialGenerationData | None:
         normalized = self._parse_uuid(generation_id)
         if normalized is None:
             return None
         stmt = select(MaterialGenerationModel).where(MaterialGenerationModel.generation_id == normalized).limit(1)
         with self._session_scope() as db:
             model = db.execute(stmt).scalar_one_or_none()
-            return self._to_row(model) if model is not None else None
+            return MaterialGenerationData.model_validate(model) if model is not None else None
 
-    def mark_extracting(self, *, generation_id: str) -> dict[str, Any]:
+    def mark_extracting(self, *, generation_id: str) -> MaterialGenerationData:
         with self._session_scope() as db:
             model = self._get_required(db, generation_id)
             model.status = int(MaterialGenerationStatus.EXTRACTING)
@@ -74,7 +75,7 @@ class MaterialRepository:
             model.error_message = None
             db.commit()
             db.refresh(model)
-            return self._to_row(model)
+            return MaterialGenerationData.model_validate(model)
 
     def mark_extracted(
         self,
@@ -83,7 +84,7 @@ class MaterialRepository:
         title: str | None,
         text: str,
         meta: dict[str, Any] | None,
-    ) -> dict[str, Any]:
+    ) -> MaterialGenerationData:
         with self._session_scope() as db:
             model = self._get_required(db, generation_id)
             model.status = int(MaterialGenerationStatus.EXTRACTED)
@@ -92,7 +93,7 @@ class MaterialRepository:
             model.extracted_meta_json = dict(meta) if meta else None
             db.commit()
             db.refresh(model)
-            return self._to_row(model)
+            return MaterialGenerationData.model_validate(model)
 
     def set_script_generation_id(self, *, generation_id: str, script_generation_id: str) -> None:
         with self._session_scope() as db:
@@ -100,7 +101,7 @@ class MaterialRepository:
             model.script_generation_id = self._require_uuid(script_generation_id, "script_generation_id")
             db.commit()
 
-    def mark_completed(self, *, generation_id: str) -> dict[str, Any]:
+    def mark_completed(self, *, generation_id: str) -> MaterialGenerationData:
         with self._session_scope() as db:
             model = self._get_required(db, generation_id)
             model.status = int(MaterialGenerationStatus.COMPLETED)
@@ -108,7 +109,7 @@ class MaterialRepository:
             model.error_message = None
             db.commit()
             db.refresh(model)
-            return self._to_row(model)
+            return MaterialGenerationData.model_validate(model)
 
     def mark_failed(
         self,
@@ -116,7 +117,7 @@ class MaterialRepository:
         generation_id: str,
         error_code: str | None,
         error_message: str | None,
-    ) -> dict[str, Any]:
+    ) -> MaterialGenerationData:
         with self._session_scope() as db:
             model = self._get_required(db, generation_id)
             model.status = int(MaterialGenerationStatus.FAILED)
@@ -124,15 +125,15 @@ class MaterialRepository:
             model.error_message = error_message
             db.commit()
             db.refresh(model)
-            return self._to_row(model)
+            return MaterialGenerationData.model_validate(model)
 
-    def mark_cancelled(self, *, generation_id: str) -> dict[str, Any]:
+    def mark_cancelled(self, *, generation_id: str) -> MaterialGenerationData:
         with self._session_scope() as db:
             model = self._get_required(db, generation_id)
             model.status = int(MaterialGenerationStatus.CANCELLED)
             db.commit()
             db.refresh(model)
-            return self._to_row(model)
+            return MaterialGenerationData.model_validate(model)
 
     def _get_required(self, db: OrmSession, generation_id: str) -> MaterialGenerationModel:
         normalized = self._require_uuid(generation_id, "generation_id")
@@ -154,25 +155,3 @@ class MaterialRepository:
         if parsed is None:
             raise RuntimeError(f"Invalid {field_name}")
         return parsed
-
-    @staticmethod
-    def _to_row(model: MaterialGenerationModel) -> dict[str, Any]:
-        status = int(model.status)
-        return {
-            "generation_id": model.generation_id,
-            "session_id": model.session_id,
-            "source_type": model.source_type,
-            "source_payload": dict(model.source_payload_json or {}),
-            "request_payload": dict(model.request_payload_json or {}),
-            "extracted_title": model.extracted_title,
-            "extracted_text": model.extracted_text,
-            "extracted_meta": dict(model.extracted_meta_json or {}),
-            "script_generation_id": model.script_generation_id,
-            "job_id": model.job_id,
-            "status": status,
-            "status_name": material_generation_status_to_name(status),
-            "error_code": model.error_code,
-            "error_message": model.error_message,
-            "created_at": model.created_at,
-            "updated_at": model.updated_at,
-        }

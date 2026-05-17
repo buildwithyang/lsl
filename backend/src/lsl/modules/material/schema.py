@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from lsl.modules.job.types import JobData
 from lsl.modules.material.extractor.base import SourceInput, WebpageSourceInput
+from lsl.modules.material.types import material_generation_status_to_name
 from lsl.modules.session.schema import SessionData
 
 
@@ -55,26 +56,40 @@ class GenerateMaterialSessionRequest(BaseModel):
 
 
 class MaterialGenerationData(BaseModel):
+    """Pydantic projection of MaterialGenerationModel.
+
+    Built via `model_validate(model)` (from_attributes=True). The `_json`
+    suffix on JSON columns is stripped here through validation_alias so the
+    API output is clean (e.g. `source_payload`, not `source_payload_json`).
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     generation_id: str
     session_id: str
     source_type: str
-    source_payload: dict[str, Any]
-    request_payload: dict[str, Any] = Field(default_factory=dict)
+    source_payload: dict[str, Any] = Field(default_factory=dict, validation_alias="source_payload_json")
+    request_payload: dict[str, Any] = Field(default_factory=dict, validation_alias="request_payload_json")
     extracted_title: str | None = None
     extracted_text: str | None = None
-    extracted_meta: dict[str, Any] = Field(default_factory=dict)
+    extracted_meta: dict[str, Any] = Field(default_factory=dict, validation_alias="extracted_meta_json")
     script_generation_id: str | None = None
     job_id: str | None = None
     status: int
-    status_name: str
     error_code: str | None = None
     error_message: str | None = None
     created_at: datetime
     updated_at: datetime
 
+    @field_validator("source_payload", "request_payload", "extracted_meta", mode="before")
     @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "MaterialGenerationData":
-        return cls(**row)
+    def _coerce_none_to_empty_dict(cls, value: Any) -> Any:
+        return value if value is not None else {}
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def status_name(self) -> str:
+        return material_generation_status_to_name(self.status)
 
 
 class GenerateMaterialSessionData(BaseModel):

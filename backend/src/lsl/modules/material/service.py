@@ -70,7 +70,9 @@ class MaterialService:
             job.job_id,
             payload.source.type,
         )
-        generation = MaterialGenerationData.from_row(self._repository.get_by_id(generation_id))
+        generation = self._repository.get_by_id(generation_id)
+        if generation is None:
+            raise RuntimeError("material generation disappeared after creation")
         session = self._session_service.get_session(session.session.session_id, auto_refresh=False)
         return GenerateMaterialSessionData(
             session=session,
@@ -82,7 +84,7 @@ class MaterialService:
         row = self._repository.get_by_id(generation_id)
         if row is None:
             raise ValueError("material generation not found")
-        return MaterialGenerationData.from_row(row)
+        return row
 
     def run_extract_job(self, *, generation_id: str) -> JobRunResult:
         """Phase 1 of the podcast flow: extract content from the source.
@@ -98,12 +100,12 @@ class MaterialService:
                 error_code="MATERIAL_GENERATION_NOT_FOUND",
                 error_message="material generation not found",
             )
-        if row["status_name"] in ("extracted", "completed", "cancelled"):
+        if row.status_name in ("extracted", "completed", "cancelled"):
             return JobRunResult(status=JobStatus.COMPLETED, progress=100)
 
         self._repository.mark_extracting(generation_id=generation_id)
         try:
-            source_input = self._build_source_input(row["source_type"], row["source_payload"])
+            source_input = self._build_source_input(row.source_type, row.source_payload)
             extractor = self._extractor_factory(source_input)
             extracted: ExtractedContent = extractor.extract(source_input)
         except Exception as exc:
@@ -131,9 +133,9 @@ class MaterialService:
             meta=extracted.meta,
         )
         if extracted.title:
-            request_payload = row.get("request_payload") or {}
+            request_payload = row.request_payload
             self._session_service.update_session(
-                session_id=row["session_id"],
+                session_id=row.session_id,
                 payload=UpdateSessionRequest(
                     title=extracted.title,
                     description=request_payload.get("description"),
@@ -155,20 +157,20 @@ class MaterialService:
         row = self._repository.get_by_id(generation_id)
         if row is None:
             raise ValueError("material generation not found")
-        status = row["status_name"]
+        status = row.status_name
         if status == "completed":
-            return MaterialGenerationData.from_row(row)
+            return row
         if status != "extracted":
             raise ValueError(
                 f"cannot confirm in status {status!r}; extraction must complete first"
             )
 
-        request_payload = row.get("request_payload") or {}
+        request_payload = row.request_payload
         extracted = ExtractedContent(
-            title=row.get("extracted_title"),
-            main_text=row.get("extracted_text") or "",
-            canonical_url=(row.get("source_payload") or {}).get("url"),
-            meta=row.get("extracted_meta") or {},
+            title=row.extracted_title,
+            main_text=row.extracted_text or "",
+            canonical_url=row.source_payload.get("url"),
+            meta=row.extracted_meta,
         )
         prompt = self._build_prompt(
             extracted=extracted,
@@ -177,7 +179,7 @@ class MaterialService:
 
         try:
             script_generation, _job = self._script_service.start_generation_from_material(
-                session_id=row["session_id"],
+                session_id=row.session_id,
                 material_generation_id=generation_id,
                 title=extracted.title or request_payload.get("title") or _DEFAULT_TITLE,
                 description=request_payload.get("description"),
@@ -218,9 +220,9 @@ class MaterialService:
         row = self._repository.get_by_id(generation_id)
         if row is None:
             raise ValueError("material generation not found")
-        status = row["status_name"]
+        status = row.status_name
         if status in ("completed", "cancelled"):
-            return MaterialGenerationData.from_row(row)
+            return row
         self._repository.mark_cancelled(generation_id=generation_id)
         logger.info("Material generation cancelled by user generation_id=%s", generation_id)
         return self.get_generation(generation_id=generation_id)
