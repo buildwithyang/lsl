@@ -11,6 +11,7 @@ import { CreateSession } from '@/pages/CreateSession';
 import { SessionDetail } from '@/pages/SessionDetail';
 import { Revise } from '@/pages/Revise';
 import { Listening } from '@/pages/Listening';
+import { PodcastPreview } from '@/pages/PodcastPreview';
 import { NotFound } from '@/pages/NotFound';
 import { I18nProvider, useI18n } from '@/i18n';
 
@@ -73,6 +74,7 @@ function App() {
                     <Route path="/dashboard" element={<AuthGate><Dashboard /></AuthGate>} />
                     <Route path="/create" element={<AuthGate><CreateSession /></AuthGate>} />
                     <Route path="/session/:id" element={<AuthGate><SessionDetail /></AuthGate>} />
+                    <Route path="/session/:id/podcast-preview" element={<AuthGate><PodcastPreview /></AuthGate>} />
                     <Route path="/session/:id/revise" element={<AuthGate><Revise /></AuthGate>} />
                     <Route path="/session/:id/listening" element={<AuthGate><Listening /></AuthGate>} />
                     <Route path="*" element={<NotFound />} />

@@ -13,6 +13,7 @@ class MaterialGenerationStatus(IntEnum):
     EXTRACTED = 2
     COMPLETED = 3
     FAILED = 4
+    CANCELLED = 5
 
 
 def material_generation_status_to_name(status: int) -> str:
@@ -22,5 +23,6 @@ def material_generation_status_to_name(status: int) -> str:
         int(MaterialGenerationStatus.EXTRACTED): "extracted",
         int(MaterialGenerationStatus.COMPLETED): "completed",
         int(MaterialGenerationStatus.FAILED): "failed",
+        int(MaterialGenerationStatus.CANCELLED): "cancelled",
     }
     return mapping.get(int(status), "pending")

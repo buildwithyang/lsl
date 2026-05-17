@@ -89,7 +89,10 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
       });
       const session = mapSessionItem(result.session);
       dispatch({ type: 'ADD_SESSION', payload: session });
-      navigate(`/session/${session.id}`);
+      const params = new URLSearchParams({
+        material_generation_id: result.material_generation.generation_id,
+      });
+      navigate(`/session/${session.id}/podcast-preview?${params.toString()}`);
     } catch (err) {
       console.error('Failed to create podcast session', err);
       setErrors({ submit: String(err) });

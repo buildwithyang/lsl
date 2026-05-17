@@ -130,7 +130,7 @@ def test_create_from_url_creates_session_generation_and_job(services):
     assert data.job.job_id
 
 
-def test_run_material_job_extracts_then_chains_to_script(services):
+def test_extract_job_stops_at_extracted_awaiting_confirmation(services):
     material_service, job_service, _extractor = services
     req = GenerateMaterialSessionRequest.model_validate(
         {
@@ -141,15 +141,63 @@ def test_run_material_job_extracts_then_chains_to_script(services):
     )
     data = material_service.create_from_url(req)
 
-    # Drive the job runner manually (synchronous claim + run).
     jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
     for job in jobs:
         job_service.run_claimed_job(job)
 
     refreshed = material_service.get_generation(generation_id=data.material_generation.generation_id)
-    assert refreshed.status_name == "completed"
-    assert refreshed.script_generation_id is not None
+    assert refreshed.status_name == "extracted"
+    assert refreshed.script_generation_id is None
     assert refreshed.extracted_title == "The Cat Care Guide"
+    assert refreshed.extracted_text and len(refreshed.extracted_text) > 0
+
+
+def test_confirm_kicks_off_script_generation(services):
+    material_service, job_service, _extractor = services
+    req = GenerateMaterialSessionRequest.model_validate(
+        {
+            "source": {"type": "webpage", "url": "https://example.com/cats"},
+            "target_language": "en-US",
+        }
+    )
+    data = material_service.create_from_url(req)
+    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
+    for job in jobs:
+        job_service.run_claimed_job(job)
+
+    confirmed = material_service.confirm_and_generate(
+        generation_id=data.material_generation.generation_id,
+    )
+    assert confirmed.status_name == "completed"
+    assert confirmed.script_generation_id is not None
+
+
+def test_confirm_rejected_before_extraction_finishes(services):
+    material_service, _job_service, _extractor = services
+    req = GenerateMaterialSessionRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/cats"}, "target_language": "en-US"}
+    )
+    data = material_service.create_from_url(req)
+    # Do not run the extract job — status stays "pending".
+    with pytest.raises(ValueError, match="extraction must complete first"):
+        material_service.confirm_and_generate(generation_id=data.material_generation.generation_id)
+
+
+def test_cancel_marks_status_cancelled(services):
+    material_service, job_service, _extractor = services
+    req = GenerateMaterialSessionRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/cats"}, "target_language": "en-US"}
+    )
+    data = material_service.create_from_url(req)
+    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
+    for job in jobs:
+        job_service.run_claimed_job(job)
+
+    cancelled = material_service.cancel_generation(
+        generation_id=data.material_generation.generation_id,
+    )
+    assert cancelled.status_name == "cancelled"
+    assert cancelled.script_generation_id is None
 
 
 def test_run_material_job_marks_failed_on_extractor_exception(services):

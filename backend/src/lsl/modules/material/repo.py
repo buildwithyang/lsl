@@ -32,12 +32,14 @@ class MaterialRepository:
         session_id: str,
         source_type: str,
         source_payload: dict[str, Any],
+        request_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         model = MaterialGenerationModel(
             generation_id=self._require_uuid(generation_id, "generation_id"),
             session_id=self._require_uuid(session_id, "session_id"),
             source_type=source_type,
             source_payload_json=dict(source_payload),
+            request_payload_json=dict(request_payload or {}),
             status=int(MaterialGenerationStatus.PENDING),
         )
         try:
@@ -124,6 +126,14 @@ class MaterialRepository:
             db.refresh(model)
             return self._to_row(model)
 
+    def mark_cancelled(self, *, generation_id: str) -> dict[str, Any]:
+        with self._session_scope() as db:
+            model = self._get_required(db, generation_id)
+            model.status = int(MaterialGenerationStatus.CANCELLED)
+            db.commit()
+            db.refresh(model)
+            return self._to_row(model)
+
     def _get_required(self, db: OrmSession, generation_id: str) -> MaterialGenerationModel:
         normalized = self._require_uuid(generation_id, "generation_id")
         model = db.get(MaterialGenerationModel, normalized)
@@ -153,6 +163,7 @@ class MaterialRepository:
             "session_id": model.session_id,
             "source_type": model.source_type,
             "source_payload": dict(model.source_payload_json or {}),
+            "request_payload": dict(model.request_payload_json or {}),
             "extracted_title": model.extracted_title,
             "extracted_text": model.extracted_text,
             "extracted_meta": dict(model.extracted_meta_json or {}),

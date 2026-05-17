@@ -20,6 +20,7 @@ class MaterialGenerationModel(Base):
     session_id: Mapped[str] = mapped_column(UUIDHexString(), nullable=False)
     source_type: Mapped[str] = mapped_column("x_source_type", String(32), nullable=False)
     source_payload_json: Mapped[dict] = mapped_column(JSONString(), nullable=False, default=dict)
+    request_payload_json: Mapped[dict] = mapped_column(JSONString(), nullable=False, default=dict)
     extracted_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     extracted_meta_json: Mapped[dict | None] = mapped_column(JSONString(), nullable=True)

@@ -334,12 +334,13 @@ CREATE TABLE IF NOT EXISTS public.material_generations (
     session_id           VARCHAR(32) NOT NULL,                     -- Created text session id.
     x_source_type        VARCHAR(32) NOT NULL,                     -- Source type, currently 'webpage'.
     source_payload_json  TEXT NOT NULL DEFAULT '{}',               -- Original source descriptor JSON, e.g. {"url": "..."}.
+    request_payload_json TEXT NOT NULL DEFAULT '{}',               -- Original podcast request payload (turn_count, difficulty, etc.) used when user confirms.
     extracted_title      VARCHAR(500),                             -- Title extracted from the source.
     extracted_text       TEXT,                                     -- Main text extracted from the source.
     extracted_meta_json  TEXT,                                     -- Extra extraction metadata JSON (truncated flag, etc.).
     script_generation_id VARCHAR(32),                              -- Downstream script generation id once chained.
     job_id               VARCHAR(32),                              -- Async job id (job_type=script_from_material).
-    x_status             SMALLINT NOT NULL DEFAULT 0,              -- 0 pending, 1 extracting, 2 extracted, 3 completed, 4 failed.
+    x_status             SMALLINT NOT NULL DEFAULT 0,              -- 0 pending, 1 extracting, 2 extracted, 3 completed, 4 failed, 5 cancelled.
     error_code           VARCHAR(64),                              -- Stable failure code.
     error_message        TEXT,                                     -- Failure detail.
     created_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Creation timestamp.

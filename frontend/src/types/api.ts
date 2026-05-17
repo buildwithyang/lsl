@@ -431,6 +431,7 @@ export interface MaterialGeneration {
   session_id: string;
   source_type: string;
   source_payload: Record<string, unknown>;
+  request_payload: Record<string, unknown>;
   extracted_title: string | null;
   extracted_text: string | null;
   extracted_meta: Record<string, unknown>;

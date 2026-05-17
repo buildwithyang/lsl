@@ -54,15 +54,13 @@ class MaterialService:
             session_id=session.session.session_id,
             source_type=payload.source.type,
             source_payload=self._source_to_payload(payload.source),
+            request_payload=self._serialize_request(payload),
         )
         job = self._job_service.create_job(
             job_type=MaterialJobHandler.job_type,
             entity_type="material_generation",
             entity_id=generation_id,
-            payload={
-                "generation_id": generation_id,
-                "request": self._serialize_request(payload),
-            },
+            payload={"generation_id": generation_id},
         )
         self._repository.set_job_id(generation_id=generation_id, job_id=job.job_id)
         logger.info(
@@ -86,7 +84,13 @@ class MaterialService:
             raise ValueError("material generation not found")
         return MaterialGenerationData.from_row(row)
 
-    def run_material_job(self, *, generation_id: str, request_payload: dict) -> JobRunResult:
+    def run_extract_job(self, *, generation_id: str) -> JobRunResult:
+        """Phase 1 of the podcast flow: extract content from the source.
+
+        Stops at `status=extracted`. The user must explicitly call
+        `confirm_and_generate` to trigger script generation, or `cancel_generation`
+        to abandon. This prevents wasted LLM spend when extraction is poor.
+        """
         row = self._repository.get_by_id(generation_id)
         if row is None:
             return JobRunResult(
@@ -94,7 +98,7 @@ class MaterialService:
                 error_code="MATERIAL_GENERATION_NOT_FOUND",
                 error_message="material generation not found",
             )
-        if row["status_name"] == "completed":
+        if row["status_name"] in ("extracted", "completed", "cancelled"):
             return JobRunResult(status=JobStatus.COMPLETED, progress=100)
 
         self._repository.mark_extracting(generation_id=generation_id)
@@ -127,6 +131,7 @@ class MaterialService:
             meta=extracted.meta,
         )
         if extracted.title:
+            request_payload = row.get("request_payload") or {}
             self._session_service.update_session(
                 session_id=row["session_id"],
                 payload=UpdateSessionRequest(
@@ -137,6 +142,34 @@ class MaterialService:
                 ),
             )
 
+        logger.info(
+            "Material extract phase done generation_id=%s text_len=%s — awaiting user confirmation",
+            generation_id,
+            len(extracted.main_text or ""),
+        )
+        return JobRunResult(status=JobStatus.COMPLETED, progress=100)
+
+    def confirm_and_generate(self, *, generation_id: str) -> MaterialGenerationData:
+        """Phase 2: kick off script generation after the user has reviewed the
+        extracted content."""
+        row = self._repository.get_by_id(generation_id)
+        if row is None:
+            raise ValueError("material generation not found")
+        status = row["status_name"]
+        if status == "completed":
+            return MaterialGenerationData.from_row(row)
+        if status != "extracted":
+            raise ValueError(
+                f"cannot confirm in status {status!r}; extraction must complete first"
+            )
+
+        request_payload = row.get("request_payload") or {}
+        extracted = ExtractedContent(
+            title=row.get("extracted_title"),
+            main_text=row.get("extracted_text") or "",
+            canonical_url=(row.get("source_payload") or {}).get("url"),
+            meta=row.get("extracted_meta") or {},
+        )
         prompt = self._build_prompt(
             extracted=extracted,
             user_steering=request_payload.get("prompt"),
@@ -164,7 +197,7 @@ class MaterialService:
                 error_code="SCRIPT_GENERATION_FAILED",
                 error_message=str(exc),
             )
-            return JobRunResult(status=JobStatus.FAILED, error_code="SCRIPT_GENERATION_FAILED", error_message=str(exc))
+            raise
 
         self._repository.set_script_generation_id(
             generation_id=generation_id,
@@ -172,11 +205,25 @@ class MaterialService:
         )
         self._repository.mark_completed(generation_id=generation_id)
         logger.info(
-            "Material job completed generation_id=%s script_generation_id=%s",
+            "Material confirmed and script generation started generation_id=%s script_generation_id=%s",
             generation_id,
             script_generation.generation_id,
         )
-        return JobRunResult(status=JobStatus.COMPLETED, progress=100)
+        return self.get_generation(generation_id=generation_id)
+
+    def cancel_generation(self, *, generation_id: str) -> MaterialGenerationData:
+        """User decided the extracted content isn't worth generating. Mark as
+        cancelled. The session row is kept so the user can revisit / delete from
+        the dashboard."""
+        row = self._repository.get_by_id(generation_id)
+        if row is None:
+            raise ValueError("material generation not found")
+        status = row["status_name"]
+        if status in ("completed", "cancelled"):
+            return MaterialGenerationData.from_row(row)
+        self._repository.mark_cancelled(generation_id=generation_id)
+        logger.info("Material generation cancelled by user generation_id=%s", generation_id)
+        return self.get_generation(generation_id=generation_id)
 
     @staticmethod
     def _build_source_input(source_type: str, payload: dict):
@@ -221,7 +268,7 @@ class MaterialService:
 
 
 class MaterialJobHandler:
-    job_type = "script_from_material"
+    job_type = "material_extraction"
 
     def __init__(self, *, material_service: MaterialService) -> None:
         self._material_service = material_service
@@ -234,8 +281,4 @@ class MaterialJobHandler:
                 error_code="MISSING_GENERATION_ID",
                 error_message="generation_id is required",
             )
-        request_payload = job.payload.get("request") or {}
-        return self._material_service.run_material_job(
-            generation_id=generation_id,
-            request_payload=dict(request_payload),
-        )
+        return self._material_service.run_extract_job(generation_id=generation_id)

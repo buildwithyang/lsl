@@ -46,3 +46,29 @@ def get_material_generation(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return ApiResponse(data=data)
+
+
+@router.post("/generations/{generation_id}/confirm", response_model=ApiResponse[MaterialGenerationData])
+def confirm_material_generation(
+    generation_id: str,
+    material_service: MaterialService = Depends(get_material_service),
+):
+    try:
+        data = material_service.confirm_and_generate(generation_id=generation_id)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 409
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return ApiResponse(data=data)
+
+
+@router.post("/generations/{generation_id}/cancel", response_model=ApiResponse[MaterialGenerationData])
+def cancel_material_generation(
+    generation_id: str,
+    material_service: MaterialService = Depends(get_material_service),
+):
+    try:
+        data = material_service.cancel_generation(generation_id=generation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(data=data)

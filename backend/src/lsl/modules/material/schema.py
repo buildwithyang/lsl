@@ -59,6 +59,7 @@ class MaterialGenerationData(BaseModel):
     session_id: str
     source_type: str
     source_payload: dict[str, Any]
+    request_payload: dict[str, Any] = Field(default_factory=dict)
     extracted_title: str | None = None
     extracted_text: str | None = None
     extracted_meta: dict[str, Any] = Field(default_factory=dict)

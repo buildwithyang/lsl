@@ -38,3 +38,17 @@ export async function getMaterialGeneration(generationId: string): Promise<Mater
   const response = await requestJson<ApiResponse<MaterialGeneration>>(`/materials/generations/${generationId}`)
   return response.data
 }
+
+export async function confirmMaterialGeneration(generationId: string): Promise<MaterialGeneration> {
+  const response = await requestJson<ApiResponse<MaterialGeneration>>(`/materials/generations/${generationId}/confirm`, {
+    method: 'POST',
+  })
+  return response.data
+}
+
+export async function cancelMaterialGeneration(generationId: string): Promise<MaterialGeneration> {
+  const response = await requestJson<ApiResponse<MaterialGeneration>>(`/materials/generations/${generationId}/cancel`, {
+    method: 'POST',
+  })
+  return response.data
+}
