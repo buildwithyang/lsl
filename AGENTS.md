@@ -17,6 +17,7 @@ AGENTS.md 的本质是限制 AI，而不是教 AI。
 - `core/` 禁止依赖 `modules/`。
 - 外部厂商适配代码必须放在所属模块内。
 - 数据库结构必须兼容 `SQLite3` 和 `PostgreSQL`。
+- 新增/修改表或列时，同步更新 `deploy/initdb/001-schema.sql`；该文件是 PostgreSQL 部署的唯一权威初始化脚本，必须和 `modules/*/model.py` 保持一致。
 
 ## Commands
 
