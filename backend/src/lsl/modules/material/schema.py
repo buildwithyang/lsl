@@ -27,7 +27,7 @@ class GenerateMaterialSessionRequest(BaseModel):
     target_language: str = Field(..., max_length=16)
     cue_language: str | None = Field(default=None, max_length=16)
     prompt: str | None = Field(default=None, max_length=4000)
-    turn_count: int = Field(default=8, ge=2, le=24)
+    turn_count: int = Field(default=16, ge=2, le=36)
     speaker_count: int = Field(default=2, ge=2, le=4)
     difficulty: str | None = Field(default="intermediate", max_length=32)
     cue_style: str | None = Field(default="自然口语、便于 TTS 演绎", max_length=200)

@@ -34,7 +34,7 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
   const sessionDescription = '';
   const [targetLanguage, setTargetLanguage] = useState('en-US');
   const [steeringPrompt, setSteeringPrompt] = useState('');
-  const turnCount = '8';
+  const [turnCount, setTurnCount] = useState('16');
   const speakerCount = '2';
   const difficulty: Difficulty = 'Beginner';
   const cueStyle = t('create.defaultCueStyle');
@@ -142,6 +142,19 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
           <SelectContent>
             <SelectItem value="en-US">{t('create.targetLanguage.english')}</SelectItem>
             <SelectItem value="zh-CN">{t('create.targetLanguage.chinese')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label className="text-[12px] font-semibold text-slate-700">{t('create.podcastLength')}</Label>
+        <Select value={turnCount} onValueChange={setTurnCount}>
+          <SelectTrigger id="podcast-length" className="mt-1.5 h-10 border-slate-200 text-[13px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="8">{t('create.podcastLength.short')}</SelectItem>
+            <SelectItem value="16">{t('create.podcastLength.medium')}</SelectItem>
+            <SelectItem value="24">{t('create.podcastLength.long')}</SelectItem>
+            <SelectItem value="36">{t('create.podcastLength.extra')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
