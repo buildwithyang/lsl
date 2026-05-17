@@ -14,7 +14,7 @@ AGENTS.md 的本质是限制 AI，而不是教 AI。
 - `api.py` 只做路由、参数、HTTP 错误映射；禁止直接访问 DB 或写核心业务。
 - `service.py` 只做业务编排；禁止写 HTTP 细节、手拼 SQL、跨模块直接调用别人的 `Repo`。
 - `repo.py` 只做持久化读写；禁止做业务决策或抛 `HTTPException`。
-- 新 repo 直接返回 Pydantic schema（`SomeData.model_validate(model, from_attributes=True)`），不要写 `_to_row` / `from_row` 那套 `dict[str, Any]` 模式；存量代码遇到时顺手迁移。
+- 新 repo 直接返回 Pydantic schema。
 - `core/` 禁止依赖 `modules/`。
 - 外部厂商适配代码必须放在所属模块内。
 - 数据库结构必须兼容 `SQLite3` 和 `PostgreSQL`。
