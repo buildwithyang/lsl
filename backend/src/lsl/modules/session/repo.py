@@ -130,6 +130,21 @@ class SessionRepository:
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to update session: {exc}") from exc
 
+    def delete_session(self, session_id: str) -> bool:
+        normalized_session_id = self._parse_uuid_str(session_id)
+        if normalized_session_id is None:
+            return False
+        try:
+            with self._session_scope() as db:
+                model = db.get(SessionModel, normalized_session_id)
+                if model is None:
+                    return False
+                db.delete(model)
+                db.commit()
+                return True
+        except SQLAlchemyError as exc:  # pragma: no cover
+            raise RuntimeError(f"Failed to delete session: {exc}") from exc
+
     def get_session_id_by_asset_object_key(self, object_key: str) -> str | None:
         stmt = select(SessionModel.session_id).where(SessionModel.asset_object_key == object_key).limit(1)
 

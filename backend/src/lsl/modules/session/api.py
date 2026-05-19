@@ -89,3 +89,17 @@ def update_session(
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return ApiResponse(data=session)
+
+
+@router.delete("/{session_id}", response_model=ApiResponse[dict])
+def delete_session(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
+    try:
+        deleted = session_service.delete_session(session_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="session not found")
+    return ApiResponse(data={"session_id": session_id, "deleted": True})

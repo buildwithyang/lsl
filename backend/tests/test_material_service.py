@@ -183,12 +183,13 @@ def test_confirm_rejected_before_extraction_finishes(services):
         material_service.confirm_and_generate(generation_id=data.material_generation.generation_id)
 
 
-def test_cancel_marks_status_cancelled(services):
+def test_cancel_marks_status_cancelled_and_deletes_session(services):
     material_service, job_service, _extractor = services
     req = GenerateMaterialSessionRequest.model_validate(
         {"source": {"type": "webpage", "url": "https://example.com/cats"}, "target_language": "en-US"}
     )
     data = material_service.create_from_url(req)
+    session_id = data.session.session.session_id
     jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
     for job in jobs:
         job_service.run_claimed_job(job)
@@ -198,6 +199,10 @@ def test_cancel_marks_status_cancelled(services):
     )
     assert cancelled.status_name == "cancelled"
     assert cancelled.script_generation_id is None
+
+    # Session row should be gone so it doesn't litter the dashboard.
+    with pytest.raises(ValueError, match="session not found"):
+        material_service._session_service.get_session(session_id)
 
 
 def test_run_material_job_marks_failed_on_extractor_exception(services):

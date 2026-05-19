@@ -214,9 +214,10 @@ class MaterialService:
         return self.get_generation(generation_id=generation_id)
 
     def cancel_generation(self, *, generation_id: str) -> MaterialGenerationData:
-        """User decided the extracted content isn't worth generating. Mark as
-        cancelled. The session row is kept so the user can revisit / delete from
-        the dashboard."""
+        """User decided the extracted content isn't worth generating. Mark the
+        material as cancelled and delete the otherwise-empty session row so it
+        doesn't clutter the dashboard. The material_generation record is kept
+        for audit (could analyze how often users hit cancel)."""
         row = self._repository.get_by_id(generation_id)
         if row is None:
             raise ValueError("material generation not found")
@@ -224,7 +225,12 @@ class MaterialService:
         if status in ("completed", "cancelled"):
             return row
         self._repository.mark_cancelled(generation_id=generation_id)
-        logger.info("Material generation cancelled by user generation_id=%s", generation_id)
+        deleted = self._session_service.delete_session(row.session_id)
+        logger.info(
+            "Material generation cancelled by user generation_id=%s session_deleted=%s",
+            generation_id,
+            deleted,
+        )
         return self.get_generation(generation_id=generation_id)
 
     @staticmethod

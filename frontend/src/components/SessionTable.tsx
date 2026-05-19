@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, RefreshCw, FileAudio, FileText } from 'lucide-react';
+import { Search, RefreshCw, FileAudio, FileText, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from './StatusBadge';
 import { useSessionFilter } from '@/hooks/useSessionFilter';
@@ -8,6 +8,7 @@ import { formatDuration, formatDate } from '@/utils/formatTime';
 import type { Session } from '@/types';
 import { useApp } from '@/context/AppContext';
 import { useI18n } from '@/i18n';
+import { deleteSession as deleteSessionApi } from '@/lib/api/sessions';
 
 interface SessionTableProps {
   sessions: Session[];
@@ -16,7 +17,8 @@ interface SessionTableProps {
 export function SessionTable({ sessions }: SessionTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { refreshSessions } = useApp();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { dispatch, refreshSessions } = useApp();
   const { t } = useI18n();
 
   const filteredSessions = useSessionFilter(sessions, searchQuery);
@@ -26,6 +28,25 @@ export function SessionTable({ sessions }: SessionTableProps) {
     await refreshSessions();
     setIsRefreshing(false);
   }, [refreshSessions]);
+
+  const handleDelete = useCallback(
+    async (event: React.MouseEvent, sessionId: string) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!window.confirm(t('sessionTable.deleteConfirm'))) return;
+      setDeletingId(sessionId);
+      try {
+        await deleteSessionApi(sessionId);
+        dispatch({ type: 'DELETE_SESSION', payload: sessionId });
+      } catch (err) {
+        console.error('Failed to delete session', err);
+        window.alert(t('sessionTable.deleteFailed'));
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [dispatch, t],
+  );
 
   return (
     <div className="space-y-4">
@@ -51,8 +72,17 @@ export function SessionTable({ sessions }: SessionTableProps) {
       {/* Mobile list */}
       <div className="space-y-2 sm:hidden">
         {filteredSessions.map((session) => (
+          <div key={session.id} className="relative">
+            <button
+              type="button"
+              onClick={(e) => handleDelete(e, session.id)}
+              disabled={deletingId === session.id}
+              title={t('sessionTable.delete')}
+              className="absolute right-2 top-2 z-10 p-1.5 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50 transition-all duration-150 disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           <Link
-            key={session.id}
             to={`/session/${session.id}`}
             className="block rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:bg-slate-50"
           >
@@ -87,6 +117,7 @@ export function SessionTable({ sessions }: SessionTableProps) {
               <span>{formatDate(session.createdAt)}</span>
             </div>
           </Link>
+          </div>
         ))}
       </div>
       {filteredSessions.length === 0 && (
@@ -152,12 +183,23 @@ export function SessionTable({ sessions }: SessionTableProps) {
                   <Link to={`/session/${session.id}`}>{formatDate(session.createdAt)}</Link>
                 </td>
                 <td className="py-3.5 px-4">
-                  <Link
-                    to={`/session/${session.id}`}
-                    className="p-1.5 rounded-md text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-150 block"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-                  </Link>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(e, session.id)}
+                      disabled={deletingId === session.id}
+                      title={t('sessionTable.delete')}
+                      className="p-1.5 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <Link
+                      to={`/session/${session.id}`}
+                      className="p-1.5 rounded-md text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-150 block"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

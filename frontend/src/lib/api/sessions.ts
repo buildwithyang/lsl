@@ -60,6 +60,12 @@ export async function updateSession(sessionId: string, payload: UpdateSessionReq
   return response.data
 }
 
+export async function deleteSession(sessionId: string): Promise<void> {
+  await requestJson<ApiResponse<{ session_id: string; deleted: boolean }>>(`/sessions/${sessionId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function listSessions({
   limit = 20,
   offset = 0,

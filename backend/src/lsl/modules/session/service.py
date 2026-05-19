@@ -119,6 +119,9 @@ class SessionService:
 
         return items
 
+    def delete_session(self, session_id: str) -> bool:
+        return self._repository.delete_session(session_id)
+
     def update_session(self, *, session_id: str, payload: UpdateSessionRequest) -> SessionData:
         existing = self._repository.get_session_by_id(session_id)
         if existing is None:
