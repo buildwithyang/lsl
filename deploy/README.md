@@ -42,9 +42,9 @@ sudo systemctl enable --now docker
 ## 2. 拉取代码
 
 ```bash
-git clone <your-repo-url> lsl
+git clone https://github.com/buildwithyang/lsl.git
 cd lsl
-git checkout <release-branch-or-tag>
+git checkout main
 ```
 
 如果你是直接把当前工作区上传到服务器，确保服务器上执行命令的位置是仓库根目录。
