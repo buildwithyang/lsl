@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invitation Code Email</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .email-container {
+            width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+        }
+
+        .code {
+            font-size: 24px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .footer {
+            font-size: 12px;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        .footer a {
+            color: #000;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h3> Organization</h3>
+            <img src="https://other-helloworld.oss-cn-hangzhou.aliyuncs.com/BuildWithYang.png" alt="LSL Logo"
+                width="300">
+        </div>
+        <p>You have been invited into LSL</p>
+        <div class="code">
+            %code
+        </div>
+        <reset-link>
+            <div class="link">
+                Or click this <a href="%link">link</a> to signup
+            </div>
+        </reset-link>
+        <p>Thanks</p>
+        <p>LSL Team</p>
+        <hr>
+        <div class="footer">
+            <p> LSL helps learners turn real situations into practical listening and speaking practice. </p>
+            <p> Visit us at <a href="https://lsl.buildwithyang.com">https://lsl.buildwithyang.com</a> </p>
+        </div>
+    </div>
+</body>
+
+</html>

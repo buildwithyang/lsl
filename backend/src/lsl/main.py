@@ -26,7 +26,7 @@ from lsl.modules.revision import RevisionJobHandler, RevisionRepository, Revisio
 from lsl.modules.revision.api import router as revision_router
 from lsl.modules.script import ScriptJobHandler, ScriptRepository, ScriptService, create_script_generator
 from lsl.modules.script.api import router as script_router
-from lsl.modules.material import MaterialJobHandler, MaterialRepository, MaterialService, build_extractor
+from lsl.modules.material import MaterialService, build_extractor
 from lsl.modules.material.api import router as material_router
 from lsl.modules.session import SessionRepository, SessionService
 from lsl.modules.session.api import router as session_router
@@ -179,11 +179,6 @@ async def lifespan(app: FastAPI):
         if db_resources.session_factory is not None
         else None
     )
-    material_repository = (
-        MaterialRepository(db_resources.session_factory)
-        if db_resources.session_factory is not None
-        else None
-    )
     user_repository = (
         UserRepository(db_resources.session_factory)
         if db_resources.session_factory is not None
@@ -287,16 +282,10 @@ async def lifespan(app: FastAPI):
     )
     material_service = (
         MaterialService(
-            repository=material_repository,
-            session_service=session_service,
             script_service=script_service,
-            job_service=job_service,
             extractor_factory=lambda payload: build_extractor(payload, settings=settings),
         )
-        if material_repository is not None
-        and session_service is not None
-        and script_service is not None
-        and job_service is not None
+        if script_service is not None
         else None
     )
     auth_service = AuthService(settings=settings, repository=user_repository)
@@ -306,8 +295,6 @@ async def lifespan(app: FastAPI):
             job_service.register_handler(AsrJobHandler(asr_service=asr_service))
         if script_service is not None:
             job_service.register_handler(ScriptJobHandler(script_service=script_service))
-        if material_service is not None:
-            job_service.register_handler(MaterialJobHandler(material_service=material_service))
         if revision_service is not None:
             # Revision job flow 4/5: register the handler that consumes revision_generation jobs.
             job_service.register_handler(RevisionJobHandler(revision_service=revision_service))

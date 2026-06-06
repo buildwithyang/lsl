@@ -12,10 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useApp } from '@/context/AppContext';
 import type { Difficulty } from '@/types';
-import { generateMaterialSession } from '@/lib/api/materials';
-import { mapSessionItem } from '@/lib/domain';
+import { extractMaterial } from '@/lib/api/materials';
+import type { PodcastPreviewLocationState } from '@/pages/PodcastPreview';
 import { useI18n } from '@/i18n';
 
 type PodcastSessionFormProps = {
@@ -26,7 +25,6 @@ const URL_PATTERN = /^https?:\/\/.+/i;
 
 export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
   const navigate = useNavigate();
-  const { dispatch } = useApp();
   const { t, language: uiLanguage } = useI18n();
 
   const [url, setUrl] = useState('');
@@ -74,28 +72,29 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
     }
     setIsSubmitting(true);
     try {
-      const result = await generateMaterialSession({
+      const extracted = await extractMaterial({
         source: { type: 'webpage', url: trimmedUrl },
-        title: sessionName || null,
-        description: sessionDescription || null,
-        targetLanguage,
-        cueLanguage: uiLanguage,
-        prompt: steeringPrompt || null,
-        turnCount: Number(turnCount),
-        speakerCount: Number(speakerCount),
-        difficulty,
-        cueStyle,
-        mustInclude: mustInclude.split(',').map((s) => s.trim()).filter(Boolean),
       });
-      const session = mapSessionItem(result.session);
-      dispatch({ type: 'ADD_SESSION', payload: session });
-      const params = new URLSearchParams({
-        material_generation_id: result.material_generation.generation_id,
-      });
-      navigate(`/session/${session.id}/podcast-preview?${params.toString()}`);
+      const state: PodcastPreviewLocationState = {
+        source: { type: 'webpage', url: trimmedUrl },
+        extracted,
+        formValues: {
+          title: sessionName || null,
+          description: sessionDescription || null,
+          targetLanguage,
+          cueLanguage: uiLanguage,
+          prompt: steeringPrompt || null,
+          turnCount: Number(turnCount),
+          speakerCount: Number(speakerCount),
+          difficulty,
+          cueStyle,
+          mustInclude: mustInclude.split(',').map((s) => s.trim()).filter(Boolean),
+        },
+      };
+      navigate('/podcast-preview', { state });
     } catch (err) {
-      console.error('Failed to create podcast session', err);
-      setErrors({ submit: String(err) });
+      console.error('Failed to extract material', err);
+      setErrors({ submit: err instanceof Error ? err.message : String(err) });
     } finally {
       setIsSubmitting(false);
     }
@@ -103,7 +102,6 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
     clearErrors,
     cueStyle,
     difficulty,
-    dispatch,
     mustInclude,
     navigate,
     sessionDescription,
@@ -200,12 +198,12 @@ export function PodcastSessionForm({ active }: PodcastSessionFormProps) {
         {isSubmitting ? (
           <span className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            {t('create.creating')}
+            {t('create.extracting')}
           </span>
         ) : (
           <span className="flex items-center gap-2">
             <Headphones className="h-4 w-4" />
-            {t('create.createPodcast')}
+            {t('create.extractAndPreview')}
           </span>
         )}
       </Button>

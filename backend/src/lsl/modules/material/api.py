@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from lsl.modules.material.schema import (
     ApiResponse,
-    GenerateMaterialSessionData,
-    GenerateMaterialSessionRequest,
-    MaterialGenerationData,
+    CreatePodcastSessionRequest,
+    ExtractMaterialRequest,
+    ExtractedContentData,
+    GenerateScriptSessionData,
 )
 from lsl.modules.material.service import MaterialService
 
@@ -22,13 +23,13 @@ def get_material_service(request: Request) -> MaterialService:
     return cast(MaterialService, service)
 
 
-@router.post("/generate-session", response_model=ApiResponse[GenerateMaterialSessionData])
-def generate_material_session(
-    payload: GenerateMaterialSessionRequest,
+@router.post("/extract", response_model=ApiResponse[ExtractedContentData])
+def extract_material(
+    payload: ExtractMaterialRequest,
     material_service: MaterialService = Depends(get_material_service),
 ):
     try:
-        data = material_service.create_from_url(payload)
+        data = material_service.extract(payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -36,39 +37,15 @@ def generate_material_session(
     return ApiResponse(data=data)
 
 
-@router.get("/generations/{generation_id}", response_model=ApiResponse[MaterialGenerationData])
-def get_material_generation(
-    generation_id: str,
+@router.post("/create-session", response_model=ApiResponse[GenerateScriptSessionData])
+def create_podcast_session(
+    payload: CreatePodcastSessionRequest,
     material_service: MaterialService = Depends(get_material_service),
 ):
     try:
-        data = material_service.get_generation(generation_id=generation_id)
+        data = material_service.create_session(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return ApiResponse(data=data)
-
-
-@router.post("/generations/{generation_id}/confirm", response_model=ApiResponse[MaterialGenerationData])
-def confirm_material_generation(
-    generation_id: str,
-    material_service: MaterialService = Depends(get_material_service),
-):
-    try:
-        data = material_service.confirm_and_generate(generation_id=generation_id)
-    except ValueError as exc:
-        message = str(exc)
-        status_code = 404 if "not found" in message else 409
-        raise HTTPException(status_code=status_code, detail=message) from exc
-    return ApiResponse(data=data)
-
-
-@router.post("/generations/{generation_id}/cancel", response_model=ApiResponse[MaterialGenerationData])
-def cancel_material_generation(
-    generation_id: str,
-    material_service: MaterialService = Depends(get_material_service),
-):
-    try:
-        data = material_service.cancel_generation(generation_id=generation_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return ApiResponse(data=data)

@@ -24,7 +24,7 @@ class GenerateScriptSessionRequest(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     target_language: str | None = Field(default="en-US", max_length=16)
     cue_language: str | None = Field(default=None, max_length=16)
-    prompt: str = Field(..., min_length=1, max_length=4000)
+    prompt: str = Field(..., min_length=1, max_length=200000)
     turn_count: int = Field(default=8, ge=2, le=36)
     speaker_count: int = Field(default=2, ge=2, le=4)
     difficulty: str | None = Field(default="intermediate", max_length=32)
@@ -95,7 +95,6 @@ class ScriptGenerationData(BaseModel):
     session_id: str
     transcript_id: str | None = None
     job_id: str | None = None
-    material_generation_id: str | None = None
     provider: str
     title: str
     description: str | None = None

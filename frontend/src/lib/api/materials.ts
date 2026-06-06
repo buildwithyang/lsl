@@ -1,8 +1,9 @@
 import { requestJson } from '@/lib/api/client'
 import type {
-  GenerateMaterialSessionRequest,
-  GenerateMaterialSessionResponse,
-  MaterialGeneration,
+  CreatePodcastSessionRequest,
+  ExtractMaterialRequest,
+  ExtractedMaterialContent,
+  GenerateScriptSessionResponse,
 } from '@/types/api'
 
 interface ApiResponse<T> {
@@ -11,14 +12,27 @@ interface ApiResponse<T> {
   data: T
 }
 
-export async function generateMaterialSession(payload: GenerateMaterialSessionRequest): Promise<GenerateMaterialSessionResponse> {
-  const response = await requestJson<ApiResponse<GenerateMaterialSessionResponse>>('/materials/generate-session', {
+export async function extractMaterial(payload: ExtractMaterialRequest): Promise<ExtractedMaterialContent> {
+  const response = await requestJson<ApiResponse<ExtractedMaterialContent>>('/materials/extract', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ source: payload.source }),
+  })
+  return response.data
+}
+
+export async function createPodcastSession(payload: CreatePodcastSessionRequest): Promise<GenerateScriptSessionResponse> {
+  const response = await requestJson<ApiResponse<GenerateScriptSessionResponse>>('/materials/create-session', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       source: payload.source,
+      extracted_title: payload.extractedTitle ?? null,
+      extracted_text: payload.extractedText,
       title: payload.title ?? null,
       description: payload.description ?? null,
       target_language: payload.targetLanguage,
@@ -30,25 +44,6 @@ export async function generateMaterialSession(payload: GenerateMaterialSessionRe
       cue_style: payload.cueStyle,
       must_include: payload.mustInclude,
     }),
-  })
-  return response.data
-}
-
-export async function getMaterialGeneration(generationId: string): Promise<MaterialGeneration> {
-  const response = await requestJson<ApiResponse<MaterialGeneration>>(`/materials/generations/${generationId}`)
-  return response.data
-}
-
-export async function confirmMaterialGeneration(generationId: string): Promise<MaterialGeneration> {
-  const response = await requestJson<ApiResponse<MaterialGeneration>>(`/materials/generations/${generationId}/confirm`, {
-    method: 'POST',
-  })
-  return response.data
-}
-
-export async function cancelMaterialGeneration(generationId: string): Promise<MaterialGeneration> {
-  const response = await requestJson<ApiResponse<MaterialGeneration>>(`/materials/generations/${generationId}/cancel`, {
-    method: 'POST',
   })
   return response.data
 }

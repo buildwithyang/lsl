@@ -9,16 +9,14 @@ from sqlalchemy.orm import sessionmaker
 
 from lsl.core.config import Settings
 from lsl.core.db import Base
-import lsl.modules.material.model  # noqa: F401
 import lsl.modules.script.model  # noqa: F401
 from lsl.modules.asset.providers import FakeStorageProvider
 from lsl.modules.asset.service import AssetService
 from lsl.modules.job.repo import JobRepository
 from lsl.modules.job.service import JobService
-from lsl.modules.material.extractor.base import ExtractedContent, WebpageSourceInput
-from lsl.modules.material.repo import MaterialRepository
-from lsl.modules.material.schema import GenerateMaterialSessionRequest
-from lsl.modules.material.service import MaterialJobHandler, MaterialService
+from lsl.modules.material.extractor.base import ExtractedContent
+from lsl.modules.material.schema import CreatePodcastSessionRequest, ExtractMaterialRequest
+from lsl.modules.material.service import MaterialService
 from lsl.modules.revision.repo import RevisionRepository
 from lsl.modules.revision.service import RevisionService
 from lsl.modules.revision.types import RevisionGenerateRequest, RevisionSuggestion
@@ -100,139 +98,117 @@ def services():
     job_service.register_handler(ScriptJobHandler(script_service=script_service))
 
     extractor = StubExtractor(
-        result=ExtractedContent(title="The Cat Care Guide", main_text="Cats need daily care." * 50, canonical_url="https://example.com/cats")
+        result=ExtractedContent(
+            title="The Cat Care Guide",
+            main_text="Cats need daily care. " * 50,
+            canonical_url="https://example.com/cats",
+        )
     )
     material_service = MaterialService(
-        repository=MaterialRepository(factory),
-        session_service=session_service,
         script_service=script_service,
-        job_service=job_service,
         extractor_factory=lambda payload: extractor,
     )
-    job_service.register_handler(MaterialJobHandler(material_service=material_service))
     return material_service, job_service, extractor
 
 
-def test_create_from_url_creates_session_generation_and_job(services):
-    material_service, _job_service, _extractor = services
-    req = GenerateMaterialSessionRequest.model_validate(
+def test_extract_returns_main_text_and_metadata(services):
+    material_service, _job_service, extractor = services
+    req = ExtractMaterialRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/cats"}}
+    )
+    data = material_service.extract(req)
+
+    assert data.title == "The Cat Care Guide"
+    assert data.main_text.startswith("Cats need daily care.")
+    assert data.canonical_url == "https://example.com/cats"
+    assert data.char_count == len(data.main_text)
+    assert data.truncated is False
+    assert len(extractor.calls) == 1
+
+
+def test_extract_raises_when_text_too_short(services):
+    material_service, _job_service, extractor = services
+    extractor._result = ExtractedContent(
+        title="Tiny",
+        main_text="Short",
+        canonical_url="https://example.com/x",
+    )
+    req = ExtractMaterialRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/x"}}
+    )
+    with pytest.raises(ValueError, match="empty or too short"):
+        material_service.extract(req)
+
+
+def test_extract_propagates_extractor_exception(services):
+    material_service, _job_service, extractor = services
+    extractor._exc = RuntimeError("boom")
+    req = ExtractMaterialRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/cats"}}
+    )
+    with pytest.raises(RuntimeError, match="boom"):
+        material_service.extract(req)
+
+
+def test_extract_reports_truncated_when_extractor_flag_set(services):
+    material_service, _job_service, extractor = services
+    extractor._result = ExtractedContent(
+        title="Big",
+        main_text="a" * 600,
+        canonical_url="https://example.com/big",
+        meta={"truncated": True},
+    )
+    req = ExtractMaterialRequest.model_validate(
+        {"source": {"type": "webpage", "url": "https://example.com/big"}}
+    )
+    data = material_service.extract(req)
+    assert data.truncated is True
+
+
+def test_create_session_delegates_to_script_service(services):
+    material_service, job_service, _extractor = services
+    extracted_text = "Cats need daily care. " * 60
+    req = CreatePodcastSessionRequest.model_validate(
         {
             "source": {"type": "webpage", "url": "https://example.com/cats"},
+            "extracted_title": "The Cat Care Guide",
+            "extracted_text": extracted_text,
             "target_language": "en-US",
             "cue_language": "zh-CN",
-            "title": "Cat care",
+            "prompt": "用初学者口吻",
+            "turn_count": 8,
         }
     )
-    data = material_service.create_from_url(req)
+    data = material_service.create_session(req)
+
     assert data.session.session.session_id
-    assert data.material_generation.status_name == "pending"
-    assert data.material_generation.source_payload == {"url": "https://example.com/cats"}
+    assert data.generation.generation_id
+    assert data.generation.title == "The Cat Care Guide"
+    assert data.generation.target_language == "en-US"
+    assert data.generation.cue_language == "zh-CN"
+    assert data.generation.turn_count == 8
+    assert "Webpage title: The Cat Care Guide" in data.generation.prompt
+    assert "Source URL: https://example.com/cats" in data.generation.prompt
+    assert extracted_text.strip() in data.generation.prompt
+    assert "用初学者口吻" in data.generation.prompt
+    assert "Ignore reference lists" in data.generation.prompt
+
+    # Job is wired and runnable.
     assert data.job.job_id
-
-
-def test_extract_job_stops_at_extracted_awaiting_confirmation(services):
-    material_service, job_service, _extractor = services
-    req = GenerateMaterialSessionRequest.model_validate(
-        {
-            "source": {"type": "webpage", "url": "https://example.com/cats"},
-            "target_language": "en-US",
-            "title": "Cat care",
-        }
-    )
-    data = material_service.create_from_url(req)
-
     jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
     for job in jobs:
         job_service.run_claimed_job(job)
 
-    refreshed = material_service.get_generation(generation_id=data.material_generation.generation_id)
-    assert refreshed.status_name == "extracted"
-    assert refreshed.script_generation_id is None
-    assert refreshed.extracted_title == "The Cat Care Guide"
-    assert refreshed.extracted_text and len(refreshed.extracted_text) > 0
 
-
-def test_confirm_kicks_off_script_generation(services):
-    material_service, job_service, _extractor = services
-    req = GenerateMaterialSessionRequest.model_validate(
-        {
-            "source": {"type": "webpage", "url": "https://example.com/cats"},
-            "target_language": "en-US",
-        }
-    )
-    data = material_service.create_from_url(req)
-    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
-    for job in jobs:
-        job_service.run_claimed_job(job)
-
-    confirmed = material_service.confirm_and_generate(
-        generation_id=data.material_generation.generation_id,
-    )
-    assert confirmed.status_name == "completed"
-    assert confirmed.script_generation_id is not None
-
-
-def test_confirm_rejected_before_extraction_finishes(services):
+def test_create_session_uses_default_title_when_missing(services):
     material_service, _job_service, _extractor = services
-    req = GenerateMaterialSessionRequest.model_validate(
-        {"source": {"type": "webpage", "url": "https://example.com/cats"}, "target_language": "en-US"}
+    req = CreatePodcastSessionRequest.model_validate(
+        {
+            "source": {"type": "webpage", "url": "https://example.com/cats"},
+            "extracted_text": "Cats need daily care. " * 60,
+            "target_language": "en-US",
+        }
     )
-    data = material_service.create_from_url(req)
-    # Do not run the extract job — status stays "pending".
-    with pytest.raises(ValueError, match="extraction must complete first"):
-        material_service.confirm_and_generate(generation_id=data.material_generation.generation_id)
-
-
-def test_cancel_marks_status_cancelled_and_deletes_session(services):
-    material_service, job_service, _extractor = services
-    req = GenerateMaterialSessionRequest.model_validate(
-        {"source": {"type": "webpage", "url": "https://example.com/cats"}, "target_language": "en-US"}
-    )
-    data = material_service.create_from_url(req)
-    session_id = data.session.session.session_id
-    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
-    for job in jobs:
-        job_service.run_claimed_job(job)
-
-    cancelled = material_service.cancel_generation(
-        generation_id=data.material_generation.generation_id,
-    )
-    assert cancelled.status_name == "cancelled"
-    assert cancelled.script_generation_id is None
-
-    # Session row should be gone so it doesn't litter the dashboard.
-    with pytest.raises(ValueError, match="session not found"):
-        material_service._session_service.get_session(session_id)
-
-
-def test_run_material_job_marks_failed_on_extractor_exception(services):
-    material_service, job_service, extractor = services
-    extractor._exc = RuntimeError("boom")
-    req = GenerateMaterialSessionRequest.model_validate(
-        {"source": {"type": "webpage", "url": "https://example.com/cats"}, "target_language": "en-US"}
-    )
-    data = material_service.create_from_url(req)
-    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
-    for job in jobs:
-        job_service.run_claimed_job(job)
-
-    refreshed = material_service.get_generation(generation_id=data.material_generation.generation_id)
-    assert refreshed.status_name == "failed"
-    assert refreshed.error_code == "EXTRACTION_FAILED"
-    assert "boom" in (refreshed.error_message or "")
-
-
-def test_run_material_job_marks_failed_when_text_too_short(services):
-    material_service, job_service, extractor = services
-    extractor._result = ExtractedContent(title="Tiny", main_text="Short", canonical_url="https://example.com/x")
-    req = GenerateMaterialSessionRequest.model_validate(
-        {"source": {"type": "webpage", "url": "https://example.com/x"}, "target_language": "en-US"}
-    )
-    data = material_service.create_from_url(req)
-    jobs = job_service.claim_due_jobs(limit=10, worker_id="test")
-    for job in jobs:
-        job_service.run_claimed_job(job)
-
-    refreshed = material_service.get_generation(generation_id=data.material_generation.generation_id)
-    assert refreshed.status_name == "failed"
-    assert refreshed.error_code == "EXTRACTION_EMPTY"
+    data = material_service.create_session(req)
+    # No explicit title / extracted_title — fallback to module default.
+    assert data.generation.title == "Podcast from webpage"

@@ -9,14 +9,14 @@ import { useI18n } from '@/i18n';
 
 export function CreateSession() {
   const { t } = useI18n();
-  const [mode, setMode] = useState<'audio' | 'ai_script' | 'podcast'>('podcast');
+  const [mode, setMode] = useState<'audio' | 'ai_script' | 'podcast'>('ai_script');
 
   const handleModeChange = useCallback((nextMode: 'audio' | 'ai_script' | 'podcast') => {
     setMode(nextMode);
   }, []);
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <Link to="/dashboard" className="mb-4 inline-flex items-center gap-1.5 text-[12px] text-slate-500 transition-colors hover:text-indigo-600">
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -27,17 +27,6 @@ export function CreateSession() {
       </div>
 
       <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-        <button
-          onClick={() => handleModeChange('audio')}
-          className={cn(
-            'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-medium transition-all duration-200',
-            mode === 'audio'
-              ? 'bg-white text-slate-800 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          )}
-        >
-          <Mic className="h-4 w-4" /> {t('create.audioUpload')}
-        </button>
         <button
           onClick={() => handleModeChange('ai_script')}
           className={cn(
@@ -60,11 +49,22 @@ export function CreateSession() {
         >
           <Headphones className="h-4 w-4" /> {t('create.podcast')}
         </button>
+        <button
+          onClick={() => handleModeChange('audio')}
+          className={cn(
+            'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-medium transition-all duration-200',
+            mode === 'audio'
+              ? 'bg-white text-slate-800 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          )}
+        >
+          <Mic className="h-4 w-4" /> {t('create.audioUpload')}
+        </button>
       </div>
 
-      <AudioSessionForm active={mode === 'audio'} />
       <AiScriptSessionForm active={mode === 'ai_script'} />
       <PodcastSessionForm active={mode === 'podcast'} />
+      <AudioSessionForm active={mode === 'audio'} />
     </div>
   );
 }

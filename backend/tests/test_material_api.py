@@ -4,7 +4,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-# Reuse the harness building blocks defined in test_material_service.py.
 from test_material_service import (
     FakeScriptGenerator,
     NoopRevisionGenerator,
@@ -17,15 +16,13 @@ from sqlalchemy.pool import StaticPool
 
 from lsl.core.config import Settings
 from lsl.core.db import Base
-import lsl.modules.material.model  # noqa: F401
 import lsl.modules.script.model  # noqa: F401
 from lsl.modules.asset.providers import FakeStorageProvider
 from lsl.modules.asset.service import AssetService
 from lsl.modules.job.repo import JobRepository
 from lsl.modules.job.service import JobService
 from lsl.modules.material.extractor.base import ExtractedContent
-from lsl.modules.material.repo import MaterialRepository
-from lsl.modules.material.service import MaterialJobHandler, MaterialService
+from lsl.modules.material.service import MaterialService
 from lsl.modules.revision.repo import RevisionRepository
 from lsl.modules.revision.service import RevisionService
 from lsl.modules.script.repo import ScriptRepository
@@ -70,16 +67,16 @@ def material_service_and_extractor():
     )
     job_service.register_handler(ScriptJobHandler(script_service=script_service))
     extractor = StubExtractor(
-        result=ExtractedContent(title="T", main_text="x" * 500, canonical_url="https://example.com/x")
+        result=ExtractedContent(
+            title="T",
+            main_text="x" * 500,
+            canonical_url="https://example.com/x",
+        )
     )
     material_service = MaterialService(
-        repository=MaterialRepository(factory),
-        session_service=session_service,
         script_service=script_service,
-        job_service=job_service,
         extractor_factory=lambda payload: extractor,
     )
-    job_service.register_handler(MaterialJobHandler(material_service=material_service))
     return material_service, extractor
 
 
@@ -92,13 +89,51 @@ def _build_app(material_service):
     return TestClient(app)
 
 
-def test_post_generate_session_returns_three_tuple(material_service_and_extractor):
+def test_post_extract_returns_content(material_service_and_extractor):
     material_service, _extractor = material_service_and_extractor
     client = _build_app(material_service)
     resp = client.post(
-        "/materials/generate-session",
+        "/materials/extract",
+        json={"source": {"type": "webpage", "url": "https://example.com/cats"}},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["code"] == 0
+    assert body["data"]["main_text"]
+    assert body["data"]["char_count"] == len(body["data"]["main_text"])
+    assert body["data"]["canonical_url"] == "https://example.com/x"
+
+
+def test_post_extract_rejects_invalid_url(material_service_and_extractor):
+    material_service, _extractor = material_service_and_extractor
+    client = _build_app(material_service)
+    resp = client.post(
+        "/materials/extract",
+        json={"source": {"type": "webpage", "url": "not-a-url"}},
+    )
+    assert resp.status_code == 422
+
+
+def test_post_extract_returns_400_when_extracted_text_too_short(material_service_and_extractor):
+    material_service, extractor = material_service_and_extractor
+    extractor._result = ExtractedContent(title="T", main_text="short", canonical_url="https://example.com/x")
+    client = _build_app(material_service)
+    resp = client.post(
+        "/materials/extract",
+        json={"source": {"type": "webpage", "url": "https://example.com/x"}},
+    )
+    assert resp.status_code == 400
+
+
+def test_post_create_session_returns_script_session(material_service_and_extractor):
+    material_service, _extractor = material_service_and_extractor
+    client = _build_app(material_service)
+    resp = client.post(
+        "/materials/create-session",
         json={
             "source": {"type": "webpage", "url": "https://example.com/cats"},
+            "extracted_title": "Cats",
+            "extracted_text": "Cats need daily care. " * 60,
             "target_language": "en-US",
             "title": "Cat care",
         },
@@ -107,37 +142,31 @@ def test_post_generate_session_returns_three_tuple(material_service_and_extracto
     body = resp.json()
     assert body["code"] == 0
     assert body["data"]["session"]["session"]["session_id"]
-    assert body["data"]["material_generation"]["status_name"] == "pending"
+    assert body["data"]["generation"]["generation_id"]
     assert body["data"]["job"]["job_id"]
 
 
-def test_post_generate_session_rejects_invalid_url(material_service_and_extractor):
+def test_post_create_session_rejects_missing_target_language(material_service_and_extractor):
     material_service, _extractor = material_service_and_extractor
     client = _build_app(material_service)
     resp = client.post(
-        "/materials/generate-session",
+        "/materials/create-session",
         json={
-            "source": {"type": "webpage", "url": "not-a-url"},
+            "source": {"type": "webpage", "url": "https://example.com/cats"},
+            "extracted_text": "Cats need daily care. " * 60,
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_post_create_session_rejects_missing_extracted_text(material_service_and_extractor):
+    material_service, _extractor = material_service_and_extractor
+    client = _build_app(material_service)
+    resp = client.post(
+        "/materials/create-session",
+        json={
+            "source": {"type": "webpage", "url": "https://example.com/cats"},
             "target_language": "en-US",
         },
     )
     assert resp.status_code == 422
-
-
-def test_post_generate_session_rejects_missing_target_language(material_service_and_extractor):
-    material_service, _extractor = material_service_and_extractor
-    client = _build_app(material_service)
-    resp = client.post(
-        "/materials/generate-session",
-        json={
-            "source": {"type": "webpage", "url": "https://example.com/cats"},
-        },
-    )
-    assert resp.status_code == 422
-
-
-def test_get_generation_returns_404_for_unknown(material_service_and_extractor):
-    material_service, _extractor = material_service_and_extractor
-    client = _build_app(material_service)
-    resp = client.get("/materials/generations/00000000000000000000000000000000")
-    assert resp.status_code == 404

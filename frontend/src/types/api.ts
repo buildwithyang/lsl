@@ -412,8 +412,24 @@ export interface TranslationItemResponse {
   updated_at: string
 }
 
-export interface GenerateMaterialSessionRequest {
-  source: { type: 'webpage'; url: string };
+export type MaterialSourceInput = { type: 'webpage'; url: string };
+
+export interface ExtractMaterialRequest {
+  source: MaterialSourceInput;
+}
+
+export interface ExtractedMaterialContent {
+  title: string | null;
+  main_text: string;
+  canonical_url: string | null;
+  truncated: boolean;
+  char_count: number;
+}
+
+export interface CreatePodcastSessionRequest {
+  source: MaterialSourceInput;
+  extractedTitle?: string | null;
+  extractedText: string;
   title?: string | null;
   description?: string | null;
   targetLanguage: string;
@@ -424,31 +440,6 @@ export interface GenerateMaterialSessionRequest {
   difficulty?: string | null;
   cueStyle?: string | null;
   mustInclude?: string[];
-}
-
-export interface MaterialGeneration {
-  generation_id: string;
-  session_id: string;
-  source_type: string;
-  source_payload: Record<string, unknown>;
-  request_payload: Record<string, unknown>;
-  extracted_title: string | null;
-  extracted_text: string | null;
-  extracted_meta: Record<string, unknown>;
-  script_generation_id: string | null;
-  job_id: string | null;
-  status: number;
-  status_name: string;
-  error_code: string | null;
-  error_message: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface GenerateMaterialSessionResponse {
-  session: SessionItem;
-  material_generation: MaterialGeneration;
-  job: JobItem;
 }
 
 export interface TranslationResponse {

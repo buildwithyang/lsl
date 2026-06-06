@@ -74,7 +74,7 @@ function App() {
                     <Route path="/dashboard" element={<AuthGate><Dashboard /></AuthGate>} />
                     <Route path="/create" element={<AuthGate><CreateSession /></AuthGate>} />
                     <Route path="/session/:id" element={<AuthGate><SessionDetail /></AuthGate>} />
-                    <Route path="/session/:id/podcast-preview" element={<AuthGate><PodcastPreview /></AuthGate>} />
+                    <Route path="/podcast-preview" element={<AuthGate><PodcastPreview /></AuthGate>} />
                     <Route path="/session/:id/revise" element={<AuthGate><Revise /></AuthGate>} />
                     <Route path="/session/:id/listening" element={<AuthGate><Listening /></AuthGate>} />
                     <Route path="*" element={<NotFound />} />

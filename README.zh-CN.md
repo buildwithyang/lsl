@@ -237,7 +237,6 @@ DATABASE_URL=postgresql://<user>:<password>@<host>:5432/lsl
 ```bash
 uv run uvicorn --app-dir backend/src lsl.main:app --reload --env-file .env
 ```
-
 ## 后端目录
 
 ```text

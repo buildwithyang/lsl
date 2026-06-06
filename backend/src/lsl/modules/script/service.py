@@ -91,55 +91,6 @@ class ScriptService:
         session = self._session_service.get_session(session.session.session_id, auto_refresh=False)
         return GenerateScriptSessionData(session=session, generation=generation, job=job, revision=None)
 
-    def start_generation_from_material(
-        self,
-        *,
-        session_id: str,
-        material_generation_id: str,
-        title: str,
-        description: str | None,
-        target_language: str | None,
-        cue_language: str | None,
-        prompt: str,
-        turn_count: int,
-        speaker_count: int,
-        difficulty: str | None,
-        cue_style: str | None,
-        must_include: list[str],
-    ) -> tuple[ScriptGenerationData, JobData]:
-        generation_id = uuid.uuid4().hex
-        self._repository.create_generation(
-            generation_id=generation_id,
-            session_id=session_id,
-            provider=self._generator.provider_name,
-            title=title,
-            description=description,
-            target_language=target_language,
-            cue_language=cue_language,
-            prompt=prompt,
-            turn_count=turn_count,
-            speaker_count=speaker_count,
-            difficulty=difficulty,
-            cue_style=cue_style,
-            must_include=must_include,
-            material_generation_id=material_generation_id,
-        )
-        job = self._job_service.create_job(
-            job_type=ScriptJobHandler.job_type,
-            entity_type="script_generation",
-            entity_id=generation_id,
-            payload={"generation_id": generation_id},
-        )
-        self._repository.set_job_id(generation_id=generation_id, job_id=job.job_id)
-        logger.info(
-            "Script generation started from material material_generation_id=%s generation_id=%s session_id=%s job_id=%s",
-            material_generation_id,
-            generation_id,
-            session_id,
-            job.job_id,
-        )
-        return self.get_generation(generation_id=generation_id), job
-
     def get_generation(self, *, generation_id: str) -> ScriptGenerationData:
         row = self._repository.get_generation_by_id(generation_id)
         if row is None:
