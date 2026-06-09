@@ -232,7 +232,31 @@ DATABASE_URL=postgresql://<user>:<password>@<host>:5432/lsl
 
 部署到 `PostgreSQL` 时，请先按当前最新的建表 SQL 初始化数据库。
 
-### 3. 启动服务
+### 3. 启动服务（一键）
+
+`./dev-start` 是一键启动脚本。不带参数时，它会把开发用域名指向本机局域网
+IP（写入 `/etc/hosts`，可能会提示输入 `sudo` 密码），在前端依赖缺失时自动安装，
+然后同时启动后端和前端。按 `Ctrl-C` 可一并停止。
+
+```bash
+./dev-start
+```
+
+其他命令：
+
+```bash
+./dev-start backend     # 写入 hosts + 仅启动后端
+./dev-start frontend    # 写入 hosts + 仅启动前端
+./dev-start apply       # 仅更新 /etc/hosts 记录
+./dev-start show        # 查看当前 hosts 记录
+./dev-start clear       # 移除 hosts 记录
+```
+
+域名（`dev.buildwithyang.com`）、端口（`8000` / `3000`）和网卡（`en0`）可分别通过
+`DEV_HOST_NAME`、`DEV_BACKEND_PORT`、`DEV_FRONTEND_PORT`、`DEV_HOST_INTERFACE`
+环境变量覆盖。运行 `./dev-start --help` 查看详情。
+
+如果只想手动启动后端、不使用该脚本：
 
 ```bash
 uv run uvicorn --app-dir backend/src lsl.main:app --reload --env-file .env

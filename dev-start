@@ -11,12 +11,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   cat <<EOF
 Usage:
-  dev-host
-  dev-host dev
-  dev-host backend
-  dev-host frontend
-  dev-host show
-  dev-host clear
+  dev-start             Update hosts entry, then start backend + frontend (one-click)
+  dev-start backend     Update hosts entry, then start backend only
+  dev-start frontend    Update hosts entry, then start frontend only
+  dev-start apply       Update the hosts entry only
+  dev-start show        Show the current hosts entry
+  dev-start clear       Remove the hosts entry
 
 Default host:
   ${HOST_NAME}
@@ -40,7 +40,7 @@ EOF
 }
 
 die() {
-  echo "dev-host: $*" >&2
+  echo "dev-start: $*" >&2
   exit 1
 }
 
@@ -83,6 +83,13 @@ get_interface_ipv4() {
   [[ -n "${ip}" ]] || die "cannot find IPv4 address for interface ${INTERFACE_NAME}"
   validate_ipv4 "${ip}" || die "invalid IPv4 address from ${INTERFACE_NAME}: ${ip}"
   echo "${ip}"
+}
+
+ensure_frontend_deps() {
+  if [[ ! -d "${ROOT_DIR}/frontend/node_modules" ]]; then
+    echo "Installing frontend dependencies..."
+    ( cd "${ROOT_DIR}/frontend" && npm install )
+  fi
 }
 
 flush_cache() {
@@ -164,6 +171,7 @@ cmd_frontend() {
   local port="${DEV_FRONTEND_PORT:-3000}"
 
   "$0" apply
+  ensure_frontend_deps
   cd "${ROOT_DIR}/frontend"
   exec npm run dev -- --host 0.0.0.0 --port "${port}"
 }
@@ -175,6 +183,7 @@ cmd_dev() {
   local frontend_pid=""
 
   "$0" apply
+  ensure_frontend_deps
 
   cleanup() {
     local exit_code=$?
@@ -231,14 +240,14 @@ main() {
   shift || true
 
   case "${command}" in
-    ""|apply)
+    ""|dev|all|start|up)
+      cmd_dev "$@"
+      ;;
+    apply)
       cmd_apply
       ;;
     show)
       cmd_show "$@"
-      ;;
-    dev|all)
-      cmd_dev "$@"
       ;;
     backend|serve|start-backend)
       cmd_backend "$@"
@@ -250,7 +259,7 @@ main() {
       ensure_write_access "${command}" "$@"
       cmd_clear "$@"
       ;;
-    -h|--help|help|"")
+    -h|--help|help)
       usage
       ;;
     *)

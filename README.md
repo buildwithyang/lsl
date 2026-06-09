@@ -222,7 +222,33 @@ DATABASE_URL=postgresql://<user>:<password>@<host>:5432/lsl
 
 When deploying with `PostgreSQL`, initialize the database with the latest schema SQL first.
 
-### 3. Start the backend
+### 3. Start the dev servers (one-click)
+
+`./dev-start` is a one-click launcher. With no arguments it points the dev
+host name at your machine's LAN IP (writes an `/etc/hosts` entry, may prompt
+for `sudo`), installs the frontend dependencies if they are missing, then
+starts both the backend and the frontend. Press `Ctrl-C` to stop both.
+
+```bash
+./dev-start
+```
+
+Other commands:
+
+```bash
+./dev-start backend     # hosts entry + backend only
+./dev-start frontend    # hosts entry + frontend only
+./dev-start apply       # update the /etc/hosts entry only
+./dev-start show        # show the current hosts entry
+./dev-start clear       # remove the hosts entry
+```
+
+The host name (`dev.buildwithyang.com`), ports (`8000` / `3000`), and network
+interface (`en0`) can be overridden via the `DEV_HOST_NAME`, `DEV_BACKEND_PORT`,
+`DEV_FRONTEND_PORT`, and `DEV_HOST_INTERFACE` environment variables. Run
+`./dev-start --help` for details.
+
+To start only the backend manually, without the helper script:
 
 ```bash
 uv run uvicorn --app-dir backend/src lsl.main:app --reload --env-file .env

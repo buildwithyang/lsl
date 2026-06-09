@@ -20,14 +20,14 @@ class TranscriptService:
         source_entity_id: str | None = None,
         language: str | None = None,
     ) -> TranscriptData:
-        row = self._repository.create_transcript(
+        transcript = self._repository.create_transcript(
             transcript_id=uuid.uuid4().hex,
             source_type=self._normalize_required(source_type, "source_type"),
             source_entity_id=self._normalize_optional(source_entity_id),
             language=self._normalize_optional(language),
             status=int(TranscriptStatus.PENDING),
         )
-        return TranscriptData.from_row(row)
+        return self._mask_raw(transcript, include_raw=False)
 
     def create_completed_transcript(
         self,
@@ -73,14 +73,13 @@ class TranscriptService:
             raise ValueError("utterances are required")
         resolved_full_text = (full_text or "\n".join(item.text for item in normalized)).strip()
         resolved_duration_ms = duration_ms if duration_ms is not None else max(int(item.end_time) for item in normalized)
-        row = self._repository.mark_completed(
+        return self._repository.mark_completed(
             transcript_id=transcript_id,
             duration_ms=resolved_duration_ms,
             full_text=resolved_full_text,
             raw_result_json=raw_result,
             utterances=[item.model_dump() for item in normalized],
         )
-        return TranscriptData.from_row(row, include_raw=True)
 
     def mark_failed(
         self,
@@ -89,18 +88,18 @@ class TranscriptService:
         error_code: str | None,
         error_message: str | None,
     ) -> TranscriptData:
-        row = self._repository.mark_failed(
+        transcript = self._repository.mark_failed(
             transcript_id=transcript_id,
             error_code=error_code,
             error_message=error_message,
         )
-        return TranscriptData.from_row(row)
+        return self._mask_raw(transcript, include_raw=False)
 
     def get_transcript(self, *, transcript_id: str, include_raw: bool = False) -> TranscriptData:
-        row = self._repository.get_transcript_by_id(transcript_id, include_utterances=True)
-        if row is None:
+        transcript = self._repository.get_transcript_by_id(transcript_id, include_utterances=True)
+        if transcript is None:
             raise ValueError("transcript not found")
-        return TranscriptData.from_row(row, include_raw=include_raw)
+        return self._mask_raw(transcript, include_raw=include_raw)
 
     def list_transcripts(
         self,
@@ -114,23 +113,32 @@ class TranscriptService:
             raise ValueError("limit must be greater than 0")
         if limit > 100:
             raise ValueError("limit must be less than or equal to 100")
-        rows = self._repository.list_transcripts(
+        transcripts = self._repository.list_transcripts(
             limit=limit,
             status=status,
             source_type=self._normalize_optional(source_type),
             source_entity_id=self._normalize_optional(source_entity_id),
         )
-        return [TranscriptData.from_row(row) for row in rows]
+        return [self._mask_raw(transcript, include_raw=False) for transcript in transcripts]
 
     def list_transcripts_by_ids(self, transcript_ids: list[str]) -> dict[str, TranscriptData]:
         normalized = sorted({item.strip() for item in transcript_ids if item and item.strip()})
         if not normalized:
             return {}
-        rows = self._repository.list_transcripts_by_ids(normalized)
-        return {str(row["transcript_id"]): TranscriptData.from_row(row) for row in rows}
+        transcripts = self._repository.list_transcripts_by_ids(normalized)
+        return {
+            transcript.transcript_id: self._mask_raw(transcript, include_raw=False)
+            for transcript in transcripts
+        }
 
     def list_utterances(self, *, transcript_id: str) -> list[TranscriptUtteranceData]:
         return self.get_transcript(transcript_id=transcript_id).utterances
+
+    @staticmethod
+    def _mask_raw(transcript: TranscriptData, *, include_raw: bool) -> TranscriptData:
+        if include_raw or transcript.raw_result is None:
+            return transcript
+        return transcript.model_copy(update={"raw_result": None})
 
     @staticmethod
     def _normalize_utterances(utterances: list[TranscriptUtterance]) -> list[TranscriptUtterance]:

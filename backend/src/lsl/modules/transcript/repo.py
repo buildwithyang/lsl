@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import sessionmaker
 
 from lsl.modules.transcript.model import TranscriptModel, TranscriptUtteranceModel
+from lsl.modules.transcript.schema import TranscriptData, TranscriptUtteranceData
 from lsl.modules.transcript.types import TranscriptStatus, transcript_status_to_name
 
 
@@ -33,7 +34,7 @@ class TranscriptRepository:
         source_entity_id: str | None,
         language: str | None,
         status: int,
-    ) -> dict[str, Any]:
+    ) -> TranscriptData:
         normalized_transcript_id = self._require_uuid(transcript_id, field_name="transcript_id")
         model = TranscriptModel(
             transcript_id=normalized_transcript_id,
@@ -47,7 +48,7 @@ class TranscriptRepository:
                 db.add(model)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model, utterances=[])
+                return self._to_data(model, utterances=[])
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to create transcript: {exc}") from exc
 
@@ -60,7 +61,7 @@ class TranscriptRepository:
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to update transcript source entity: {exc}") from exc
 
-    def get_transcript_by_id(self, transcript_id: str, *, include_utterances: bool = True) -> dict[str, Any] | None:
+    def get_transcript_by_id(self, transcript_id: str, *, include_utterances: bool = True) -> TranscriptData | None:
         normalized_transcript_id = self._parse_uuid_str(transcript_id)
         if normalized_transcript_id is None:
             return None
@@ -72,7 +73,7 @@ class TranscriptRepository:
                 if model is None:
                     return None
                 utterances = self._load_utterances(db, normalized_transcript_id) if include_utterances else []
-                return self._to_row(model, utterances=utterances)
+                return self._to_data(model, utterances=utterances)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query transcript by id: {exc}") from exc
 
@@ -83,7 +84,7 @@ class TranscriptRepository:
         status: int | None = None,
         source_type: str | None = None,
         source_entity_id: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[TranscriptData]:
         stmt = select(TranscriptModel)
         if status is not None:
             stmt = stmt.where(TranscriptModel.status == int(status))
@@ -96,11 +97,11 @@ class TranscriptRepository:
         try:
             with self._session_scope() as db:
                 rows = db.execute(stmt).scalars().all()
-                return [self._to_row(model, utterances=[]) for model in rows]
+                return [self._to_data(model, utterances=[]) for model in rows]
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to list transcripts: {exc}") from exc
 
-    def list_transcripts_by_ids(self, transcript_ids: list[str]) -> list[dict[str, Any]]:
+    def list_transcripts_by_ids(self, transcript_ids: list[str]) -> list[TranscriptData]:
         normalized = [self._parse_uuid_str(item) for item in transcript_ids]
         filtered = [item for item in normalized if item is not None]
         if not filtered:
@@ -109,7 +110,7 @@ class TranscriptRepository:
         try:
             with self._session_scope() as db:
                 rows = db.execute(stmt).scalars().all()
-                return [self._to_row(model, utterances=[]) for model in rows]
+                return [self._to_data(model, utterances=[]) for model in rows]
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query transcripts by ids: {exc}") from exc
 
@@ -121,7 +122,7 @@ class TranscriptRepository:
         full_text: str | None,
         raw_result_json: dict[str, Any] | None,
         utterances: list[dict[str, Any]],
-    ) -> dict[str, Any]:
+    ) -> TranscriptData:
         normalized_transcript_id = self._require_uuid(transcript_id, field_name="transcript_id")
         try:
             with self._session_scope() as db:
@@ -153,7 +154,7 @@ class TranscriptRepository:
                 db.commit()
                 db.refresh(model)
                 loaded = self._load_utterances(db, normalized_transcript_id)
-                return self._to_row(model, utterances=loaded)
+                return self._to_data(model, utterances=loaded)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to complete transcript: {exc}") from exc
 
@@ -163,7 +164,7 @@ class TranscriptRepository:
         transcript_id: str,
         error_code: str | None,
         error_message: str | None,
-    ) -> dict[str, Any]:
+    ) -> TranscriptData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_transcript(db, transcript_id)
@@ -172,7 +173,7 @@ class TranscriptRepository:
                 model.error_message = error_message
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model, utterances=[])
+                return self._to_data(model, utterances=[])
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark transcript as failed: {exc}") from exc
 
@@ -193,34 +194,36 @@ class TranscriptRepository:
         return list(db.execute(stmt).scalars().all())
 
     @staticmethod
-    def _to_row(model: TranscriptModel, *, utterances: list[TranscriptUtteranceModel]) -> dict[str, Any]:
+    def _to_data(model: TranscriptModel, *, utterances: list[TranscriptUtteranceModel]) -> TranscriptData:
         status = int(model.status)
-        return {
-            "transcript_id": model.transcript_id,
-            "source_type": model.source_type,
-            "source_entity_id": model.source_entity_id,
-            "language": model.language,
-            "duration_ms": model.duration_ms,
-            "full_text": model.full_text,
-            "raw_result": model.raw_result_json,
-            "status": status,
-            "status_name": transcript_status_to_name(status),
-            "error_code": model.error_code,
-            "error_message": model.error_message,
-            "created_at": model.created_at,
-            "updated_at": model.updated_at,
-            "utterances": [
-                {
-                    "seq": int(item.seq),
-                    "text": item.text,
-                    "speaker": item.speaker,
-                    "start_time": int(item.start_time),
-                    "end_time": int(item.end_time),
-                    "additions": item.additions_json or {},
-                }
+        duration_ms = int(model.duration_ms) if model.duration_ms is not None else None
+        return TranscriptData(
+            transcript_id=model.transcript_id,
+            source_type=model.source_type,
+            source_entity_id=model.source_entity_id,
+            language=model.language,
+            duration_ms=duration_ms,
+            duration_sec=(duration_ms / 1000) if duration_ms is not None else None,
+            full_text=model.full_text,
+            raw_result=model.raw_result_json,
+            status=status,
+            status_name=transcript_status_to_name(status),
+            error_code=model.error_code,
+            error_message=model.error_message,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+            utterances=[
+                TranscriptUtteranceData(
+                    seq=int(item.seq),
+                    text=item.text,
+                    speaker=item.speaker,
+                    start_time=int(item.start_time),
+                    end_time=int(item.end_time),
+                    additions=item.additions_json or {},
+                )
                 for item in utterances
             ],
-        }
+        )
 
     @staticmethod
     def _parse_uuid_str(value: str) -> str | None:
