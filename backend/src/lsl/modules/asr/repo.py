@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Iterator
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import sessionmaker
 
 from lsl.modules.asr.model import AsrRecognitionModel
+from lsl.modules.asr.schema import AsrRecognitionData
 from lsl.modules.asr.types import AsrRecognitionStatus, asr_recognition_status_to_name
 
 
@@ -198,31 +199,31 @@ class AsrRepository:
         return model
 
     @staticmethod
-    def _to_row(model: AsrRecognitionModel) -> dict[str, Any]:
+    def _to_data(model: AsrRecognitionModel) -> AsrRecognitionData:
         status = int(model.status)
-        return {
-            "recognition_id": model.recognition_id,
-            "transcript_id": model.transcript_id,
-            "job_id": model.job_id,
-            "object_key": model.object_key,
-            "audio_url": model.audio_url,
-            "target_language": model.target_language,
-            "provider": model.provider,
-            "status": status,
-            "status_name": asr_recognition_status_to_name(status),
-            "provider_request_id": model.provider_request_id,
-            "provider_resource_id": model.provider_resource_id,
-            "x_tt_logid": model.x_tt_logid,
-            "provider_status_code": model.provider_status_code,
-            "provider_message": model.provider_message,
-            "error_code": model.error_code,
-            "error_message": model.error_message,
-            "poll_count": int(model.poll_count),
-            "last_polled_at": model.last_polled_at,
-            "next_poll_at": model.next_poll_at,
-            "created_at": model.created_at,
-            "updated_at": model.updated_at,
-        }
+        return AsrRecognitionData(
+            recognition_id=model.recognition_id,
+            transcript_id=model.transcript_id,
+            job_id=model.job_id,
+            object_key=model.object_key,
+            audio_url=model.audio_url,
+            target_language=model.target_language,
+            provider=model.provider,
+            status=status,
+            status_name=asr_recognition_status_to_name(status),
+            provider_request_id=model.provider_request_id,
+            provider_resource_id=model.provider_resource_id,
+            x_tt_logid=model.x_tt_logid,
+            provider_status_code=model.provider_status_code,
+            provider_message=model.provider_message,
+            error_code=model.error_code,
+            error_message=model.error_message,
+            poll_count=int(model.poll_count),
+            last_polled_at=model.last_polled_at,
+            next_poll_at=model.next_poll_at,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
 
     @staticmethod
     def _parse_uuid_str(value: str) -> str | None:
