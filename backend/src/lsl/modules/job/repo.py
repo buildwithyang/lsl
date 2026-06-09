@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import sessionmaker
 
 from lsl.modules.job.model import JobModel
-from lsl.modules.job.types import JobStatus, job_status_to_name
+from lsl.modules.job.types import JobData, JobStatus, job_status_to_name
 
 
 class JobRepository:
@@ -37,7 +37,7 @@ class JobRepository:
         priority: int,
         max_attempts: int,
         next_run_at: datetime | None,
-    ) -> dict[str, Any]:
+    ) -> JobData:
         normalized_job_id = self._require_uuid(job_id, field_name="job_id")
         model = JobModel(
             job_id=normalized_job_id,
@@ -57,11 +57,11 @@ class JobRepository:
                 db.add(model)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to create job: {exc}") from exc
 
-    def get_job_by_id(self, job_id: str) -> dict[str, Any] | None:
+    def get_job_by_id(self, job_id: str) -> JobData | None:
         normalized_job_id = self._parse_uuid_str(job_id)
         if normalized_job_id is None:
             return None
@@ -70,7 +70,7 @@ class JobRepository:
         try:
             with self._session_scope() as db:
                 model = db.execute(stmt).scalar_one_or_none()
-                return self._to_row(model) if model is not None else None
+                return self._to_data(model) if model is not None else None
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query job by id: {exc}") from exc
 
@@ -82,7 +82,7 @@ class JobRepository:
         job_type: str | None = None,
         entity_type: str | None = None,
         entity_id: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[JobData]:
         stmt = select(JobModel)
         if status is not None:
             stmt = stmt.where(JobModel.status == int(status))
@@ -97,7 +97,7 @@ class JobRepository:
         try:
             with self._session_scope() as db:
                 rows = db.execute(stmt).scalars().all()
-                return [self._to_row(model) for model in rows]
+                return [self._to_data(model) for model in rows]
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to list jobs: {exc}") from exc
 
@@ -107,7 +107,7 @@ class JobRepository:
         job_id: str,
         worker_id: str,
         lock_ttl_seconds: int,
-    ) -> dict[str, Any] | None:
+    ) -> JobData | None:
         normalized_job_id = self._parse_uuid_str(job_id)
         if normalized_job_id is None:
             return None
@@ -128,7 +128,7 @@ class JobRepository:
                 self._claim_model(model, worker_id=worker_id, lock_ttl_seconds=lock_ttl_seconds, now=now)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to claim job: {exc}") from exc
 
@@ -138,7 +138,7 @@ class JobRepository:
         worker_id: str,
         limit: int,
         lock_ttl_seconds: int,
-    ) -> list[dict[str, Any]]:
+    ) -> list[JobData]:
         now = datetime.now(timezone.utc)
         stmt = (
             select(JobModel)
@@ -156,7 +156,7 @@ class JobRepository:
                 db.commit()
                 for model in rows:
                     db.refresh(model)
-                return [self._to_row(model) for model in rows]
+                return [self._to_data(model) for model in rows]
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to claim due jobs: {exc}") from exc
 
@@ -168,7 +168,7 @@ class JobRepository:
         next_run_at: datetime | None,
         entity_type: str | None,
         entity_id: str | None,
-    ) -> dict[str, Any]:
+    ) -> JobData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_job(db, job_id)
@@ -186,7 +186,7 @@ class JobRepository:
                 model.error_message = None
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark job as running: {exc}") from exc
 
@@ -198,7 +198,7 @@ class JobRepository:
         result: dict[str, Any] | None,
         entity_type: str | None,
         entity_id: str | None,
-    ) -> dict[str, Any]:
+    ) -> JobData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_job(db, job_id)
@@ -217,7 +217,7 @@ class JobRepository:
                 model.finished_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark job as completed: {exc}") from exc
 
@@ -228,7 +228,7 @@ class JobRepository:
         error_code: str | None,
         error_message: str | None,
         progress: int | None = None,
-    ) -> dict[str, Any]:
+    ) -> JobData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_job(db, job_id)
@@ -243,11 +243,11 @@ class JobRepository:
                 model.finished_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark job as failed: {exc}") from exc
 
-    def mark_canceled(self, *, job_id: str, error_message: str | None = None) -> dict[str, Any]:
+    def mark_canceled(self, *, job_id: str, error_message: str | None = None) -> JobData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_job(db, job_id)
@@ -260,7 +260,7 @@ class JobRepository:
                 model.finished_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to cancel job: {exc}") from exc
 
@@ -288,31 +288,31 @@ class JobRepository:
         return model
 
     @staticmethod
-    def _to_row(model: JobModel) -> dict[str, Any]:
+    def _to_data(model: JobModel) -> JobData:
         status = int(model.status)
-        return {
-            "job_id": model.job_id,
-            "job_type": model.job_type,
-            "status": status,
-            "status_name": job_status_to_name(status),
-            "entity_type": model.entity_type,
-            "entity_id": model.entity_id,
-            "priority": int(model.priority),
-            "progress": int(model.progress),
-            "attempts": int(model.attempts),
-            "max_attempts": int(model.max_attempts),
-            "payload": model.payload_json or {},
-            "result": model.result_json,
-            "error_code": model.error_code,
-            "error_message": model.error_message,
-            "locked_by": model.locked_by,
-            "locked_until": model.locked_until,
-            "next_run_at": model.next_run_at,
-            "started_at": model.started_at,
-            "finished_at": model.finished_at,
-            "created_at": model.created_at,
-            "updated_at": model.updated_at,
-        }
+        return JobData(
+            job_id=model.job_id,
+            job_type=model.job_type,
+            status=status,
+            status_name=job_status_to_name(status),
+            entity_type=model.entity_type,
+            entity_id=model.entity_id,
+            priority=int(model.priority),
+            progress=int(model.progress),
+            attempts=int(model.attempts),
+            max_attempts=int(model.max_attempts),
+            payload=model.payload_json or {},
+            result=model.result_json,
+            error_code=model.error_code,
+            error_message=model.error_message,
+            locked_by=model.locked_by,
+            locked_until=model.locked_until,
+            next_run_at=model.next_run_at,
+            started_at=model.started_at,
+            finished_at=model.finished_at,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
 
     @staticmethod
     def _normalize_progress(value: int) -> int:
