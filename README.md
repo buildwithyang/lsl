@@ -73,11 +73,13 @@ Example:
 
 Implementation-oriented module docs:
 
+- `backend/src/lsl/modules/auth/README.md`
 - `backend/src/lsl/modules/asset/README.md`
 - `backend/src/lsl/modules/job/README.md`
 - `backend/src/lsl/modules/transcript/README.md`
 - `backend/src/lsl/modules/asr/README.md`
 - `backend/src/lsl/modules/script/README.md`
+- `backend/src/lsl/modules/material/README.md`
 - `backend/src/lsl/modules/session/README.md`
 - `backend/src/lsl/modules/revision/README.md`
 - `backend/src/lsl/modules/translation/`
@@ -239,6 +241,7 @@ backend/
 |  `- logger.py
 |
 `- modules/
+   |- auth/
    |- asset/
    |- job/
    |- transcript/
@@ -246,6 +249,7 @@ backend/
    |- session/
    |- revision/
    |- script/
+   |- material/
    |- translation/
    `- tts/
 ```
