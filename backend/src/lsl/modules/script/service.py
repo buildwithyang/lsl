@@ -56,7 +56,7 @@ class ScriptService:
             )
         )
         generation_id = uuid.uuid4().hex
-        row = self._repository.create_generation(
+        self._repository.create_generation(
             generation_id=generation_id,
             session_id=session.session.session_id,
             provider=self._generator.provider_name,
@@ -92,30 +92,29 @@ class ScriptService:
         return GenerateScriptSessionData(session=session, generation=generation, job=job, revision=None)
 
     def get_generation(self, *, generation_id: str) -> ScriptGenerationData:
-        row = self._repository.get_generation_by_id(generation_id)
-        if row is None:
+        generation = self._repository.get_generation_by_id(generation_id)
+        if generation is None:
             raise ValueError("script generation not found")
-        return ScriptGenerationData.from_row(row)
+        return generation
 
     def get_generation_preview(self, *, generation_id: str) -> ScriptGenerationPreviewData:
-        row = self._repository.get_generation_by_id(generation_id)
-        if row is None:
+        generation = self._repository.get_generation_by_id(generation_id)
+        if generation is None:
             raise ValueError("script generation not found")
         items = self._repository.get_generation_preview_items(generation_id=generation_id)
         if items is None:
             raise ValueError("script generation not found")
         return ScriptGenerationPreviewData(
-            generation=ScriptGenerationData.from_row(row),
+            generation=generation,
             items=[ScriptGenerationPreviewItemData(**item) for item in items],
         )
 
     def run_generation_job(self, *, generation_id: str) -> JobRunResult:
         started_at = time.monotonic()
-        row = self._repository.get_generation_by_id(generation_id)
-        if row is None:
+        generation = self._repository.get_generation_by_id(generation_id)
+        if generation is None:
             logger.warning("Script generation job missing generation_id=%s", generation_id)
             return JobRunResult(status=JobStatus.FAILED, error_code="GENERATION_NOT_FOUND", error_message="script generation not found")
-        generation = ScriptGenerationData.from_row(row)
         if generation.transcript_id and generation.status_name == "completed":
             logger.info(
                 "Script generation job already completed generation_id=%s transcript_id=%s",

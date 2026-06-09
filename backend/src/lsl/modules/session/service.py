@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from lsl.modules.asset.schema import AssetListItemData
 from lsl.modules.asset.service import AssetService
 from lsl.modules.session.model import SessionModel
 from lsl.modules.session.repo import SessionRepository
@@ -58,7 +59,7 @@ class SessionService:
         if session is None:
             raise ValueError("session not found")
 
-        asset: dict[str, Any] | None = None
+        asset: AssetListItemData | None = None
         asset_object_key = self._normalize_object_key(session.asset_object_key)
         if asset_object_key is not None:
             try:
@@ -164,7 +165,7 @@ class SessionService:
         self,
         session: SessionModel,
         *,
-        asset: dict[str, Any] | None = None,
+        asset: AssetListItemData | None = None,
         transcript: TranscriptData | None = None,
     ) -> SessionData:
         return SessionData.model_validate(
@@ -175,7 +176,7 @@ class SessionService:
             }
         )
 
-    def _load_assets_by_sessions(self, sessions: list[SessionModel]) -> dict[str, dict[str, Any]]:
+    def _load_assets_by_sessions(self, sessions: list[SessionModel]) -> dict[str, AssetListItemData]:
         object_keys_set: set[str] = set()
         for session in sessions:
             normalized = self._normalize_object_key(session.asset_object_key)

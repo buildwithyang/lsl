@@ -60,7 +60,7 @@ class AsrService:
             language=target_language,
         )
         recognition_id = uuid.uuid4().hex
-        row = self._repository.create_recognition(
+        recognition = self._repository.create_recognition(
             recognition_id=recognition_id,
             transcript_id=transcript.transcript_id,
             object_key=normalized_object_key,
@@ -68,7 +68,6 @@ class AsrService:
             target_language=target_language,
             provider=self._provider_name(),
         )
-        recognition = AsrRecognitionData.from_row(row)
         self._transcript_service.update_source_entity(
             transcript_id=transcript.transcript_id,
             source_entity_id=recognition.recognition_id,
@@ -85,20 +84,17 @@ class AsrService:
         return CreateAsrRecognitionData(recognition=recognition, transcript=transcript, job=job)
 
     def get_recognition(self, *, recognition_id: str) -> AsrRecognitionData:
-        row = self._repository.get_recognition_by_id(recognition_id)
-        if row is None:
+        recognition = self._repository.get_recognition_by_id(recognition_id)
+        if recognition is None:
             raise ValueError("asr recognition not found")
-        return AsrRecognitionData.from_row(row)
+        return recognition
 
     def list_recognitions(self, *, limit: int = 20, status: int | None = None) -> list[AsrRecognitionData]:
         if limit <= 0:
             raise ValueError("limit must be greater than 0")
         if limit > 100:
             raise ValueError("limit must be less than or equal to 100")
-        return [
-            AsrRecognitionData.from_row(row)
-            for row in self._repository.list_recognitions(limit=limit, status=status)
-        ]
+        return self._repository.list_recognitions(limit=limit, status=status)
 
     def run_recognition_job(self, *, recognition_id: str) -> JobRunResult:
         recognition = self.get_recognition(recognition_id=recognition_id)

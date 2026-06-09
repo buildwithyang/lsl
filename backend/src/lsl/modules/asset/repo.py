@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Iterator
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import sessionmaker
 
 from lsl.modules.asset.model import AssetModel
+from lsl.modules.asset.schema import AssetData
 
 
 class AssetRepository:
@@ -62,7 +63,7 @@ class AssetRepository:
         limit: int,
         category: str | None = None,
         entity_id: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[AssetData]:
         stmt = select(AssetModel)
         if category:
             stmt = stmt.where(AssetModel.category == category)
@@ -73,20 +74,20 @@ class AssetRepository:
         try:
             with self._session_scope() as db:
                 rows = db.execute(stmt).scalars().all()
-                return [self._to_row(model) for model in rows]
+                return [self._to_data(model) for model in rows]
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to list asset records: {exc}") from exc
 
-    def get_asset_by_object_key(self, *, object_key: str) -> dict[str, Any] | None:
+    def get_asset_by_object_key(self, *, object_key: str) -> AssetData | None:
         stmt = select(AssetModel).where(AssetModel.object_key == object_key).limit(1)
         try:
             with self._session_scope() as db:
                 model = db.execute(stmt).scalar_one_or_none()
-                return self._to_row(model) if model is not None else None
+                return self._to_data(model) if model is not None else None
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query asset by object_key: {exc}") from exc
 
-    def list_assets_by_object_keys(self, *, object_keys: list[str]) -> list[dict[str, Any]]:
+    def list_assets_by_object_keys(self, *, object_keys: list[str]) -> list[AssetData]:
         if not object_keys:
             return []
 
@@ -94,20 +95,20 @@ class AssetRepository:
         try:
             with self._session_scope() as db:
                 rows = db.execute(stmt).scalars().all()
-                return [self._to_row(model) for model in rows]
+                return [self._to_data(model) for model in rows]
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query assets by object_keys: {exc}") from exc
 
     @staticmethod
-    def _to_row(model: AssetModel) -> dict[str, Any]:
-        return {
-            "object_key": model.object_key,
-            "category": model.category,
-            "entity_id": model.entity_id,
-            "filename": model.filename,
-            "content_type": model.content_type,
-            "file_size": model.file_size,
-            "etag": model.etag,
-            "upload_status": int(model.upload_status),
-            "created_at": model.created_at,
-        }
+    def _to_data(model: AssetModel) -> AssetData:
+        return AssetData(
+            object_key=model.object_key,
+            category=model.category,
+            entity_id=model.entity_id,
+            filename=model.filename,
+            content_type=model.content_type,
+            file_size=model.file_size,
+            etag=model.etag,
+            upload_status=int(model.upload_status),
+            created_at=model.created_at,
+        )

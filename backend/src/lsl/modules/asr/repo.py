@@ -36,7 +36,7 @@ class AsrRepository:
         audio_url: str,
         target_language: str | None,
         provider: str,
-    ) -> dict[str, Any]:
+    ) -> AsrRecognitionData:
         normalized_recognition_id = self._require_uuid(recognition_id, field_name="recognition_id")
         model = AsrRecognitionModel(
             recognition_id=normalized_recognition_id,
@@ -52,7 +52,7 @@ class AsrRepository:
                 db.add(model)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to create ASR recognition: {exc}") from exc
 
@@ -65,7 +65,7 @@ class AsrRepository:
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to set ASR recognition job id: {exc}") from exc
 
-    def get_recognition_by_id(self, recognition_id: str) -> dict[str, Any] | None:
+    def get_recognition_by_id(self, recognition_id: str) -> AsrRecognitionData | None:
         normalized = self._parse_uuid_str(recognition_id)
         if normalized is None:
             return None
@@ -73,11 +73,11 @@ class AsrRepository:
         try:
             with self._session_scope() as db:
                 model = db.execute(stmt).scalar_one_or_none()
-                return self._to_row(model) if model is not None else None
+                return self._to_data(model) if model is not None else None
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query ASR recognition: {exc}") from exc
 
-    def list_recognitions(self, *, limit: int, status: int | None = None) -> list[dict[str, Any]]:
+    def list_recognitions(self, *, limit: int, status: int | None = None) -> list[AsrRecognitionData]:
         stmt = select(AsrRecognitionModel)
         if status is not None:
             stmt = stmt.where(AsrRecognitionModel.status == int(status))
@@ -85,7 +85,7 @@ class AsrRepository:
         try:
             with self._session_scope() as db:
                 rows = db.execute(stmt).scalars().all()
-                return [self._to_row(model) for model in rows]
+                return [self._to_data(model) for model in rows]
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to list ASR recognitions: {exc}") from exc
 
@@ -97,7 +97,7 @@ class AsrRepository:
         provider_resource_id: str | None,
         x_tt_logid: str | None,
         next_poll_at: datetime,
-    ) -> dict[str, Any]:
+    ) -> AsrRecognitionData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_recognition(db, recognition_id)
@@ -110,7 +110,7 @@ class AsrRepository:
                 model.error_message = None
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark ASR recognition submitted: {exc}") from exc
 
@@ -122,7 +122,7 @@ class AsrRepository:
         provider_message: str | None,
         x_tt_logid: str | None,
         next_poll_at: datetime,
-    ) -> dict[str, Any]:
+    ) -> AsrRecognitionData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_recognition(db, recognition_id)
@@ -135,7 +135,7 @@ class AsrRepository:
                 model.next_poll_at = next_poll_at
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark ASR recognition processing: {exc}") from exc
 
@@ -146,7 +146,7 @@ class AsrRepository:
         provider_status_code: str | None,
         provider_message: str | None,
         x_tt_logid: str | None,
-    ) -> dict[str, Any]:
+    ) -> AsrRecognitionData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_recognition(db, recognition_id)
@@ -160,7 +160,7 @@ class AsrRepository:
                 model.next_poll_at = None
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark ASR recognition completed: {exc}") from exc
 
@@ -173,7 +173,7 @@ class AsrRepository:
         provider_status_code: str | None = None,
         provider_message: str | None = None,
         x_tt_logid: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> AsrRecognitionData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_recognition(db, recognition_id)
@@ -187,7 +187,7 @@ class AsrRepository:
                 model.next_poll_at = None
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark ASR recognition failed: {exc}") from exc
 

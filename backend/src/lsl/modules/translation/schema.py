@@ -5,8 +5,6 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field, field_validator
 
-from lsl.modules.translation.types import translation_item_status_to_name, translation_status_to_name
-
 T = TypeVar("T")
 
 
@@ -103,48 +101,3 @@ class TranslationData(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[TranslationItemData] = Field(default_factory=list)
-
-    @classmethod
-    def from_row(cls, row: dict) -> "TranslationData":
-        status = int(row["status"])
-        return cls(
-            translation_id=str(row["translation_id"]),
-            session_id=row.get("session_id"),
-            source_type=str(row["source_type"]),
-            source_entity_id=str(row["source_entity_id"]),
-            source_language=row.get("source_language"),
-            target_language=str(row["target_language"]),
-            job_id=row.get("job_id"),
-            provider=str(row["provider"]),
-            model=row.get("model"),
-            status=status,
-            status_name=translation_status_to_name(status),
-            item_count=int(row["item_count"]),
-            completed_count=int(row["completed_count"]),
-            stale_count=int(row["stale_count"]),
-            error_code=row.get("error_code"),
-            error_message=row.get("error_message"),
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            items=[
-                TranslationItemData(
-                    item_id=str(item["item_id"]),
-                    translation_id=str(item["translation_id"]),
-                    source_item_key=str(item["source_item_key"]),
-                    source_seq=item.get("source_seq"),
-                    speaker=item.get("speaker"),
-                    start_time=item.get("start_time"),
-                    end_time=item.get("end_time"),
-                    source_text=str(item["source_text"]),
-                    source_text_hash=str(item["source_text_hash"]),
-                    translated_text=item.get("translated_text"),
-                    status=int(item["status"]),
-                    status_name=translation_item_status_to_name(int(item["status"])),
-                    error_code=item.get("error_code"),
-                    error_message=item.get("error_message"),
-                    created_at=item["created_at"],
-                    updated_at=item["updated_at"],
-                )
-                for item in row.get("items", [])
-            ],
-        )

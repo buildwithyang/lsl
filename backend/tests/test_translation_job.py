@@ -278,8 +278,8 @@ def test_stale_translation_without_active_job_is_partial() -> None:
         ],
     )
 
-    assert row["status"] == int(TranslationStatus.PARTIAL)
-    assert row["stale_count"] == 1
+    assert row.status == int(TranslationStatus.PARTIAL)
+    assert row.stale_count == 1
 
 
 def test_translate_single_item_runs_without_job() -> None:

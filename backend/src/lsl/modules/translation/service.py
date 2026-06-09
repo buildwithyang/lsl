@@ -49,25 +49,24 @@ class TranslationService:
         normalized_source_type = self._normalize_source_type(source_type)
         source = self._load_source_items(source_type=normalized_source_type, source_entity_id=source_entity_id)
         target = self._normalize_language(target_language)
-        row = self._repository.get_translation_by_source(
+        existing = self._repository.get_translation_by_source(
             source_type=normalized_source_type,
             source_entity_id=source_entity_id,
             target_language=target,
         )
-        if row is None:
+        if existing is None:
             raise ValueError("translation not found")
-        row = self._repository.upsert_translation(
-            translation_id=row["translation_id"],
-            session_id=row.get("session_id"),
-            source_type=row["source_type"],
-            source_entity_id=row["source_entity_id"],
+        return self._repository.upsert_translation(
+            translation_id=existing.translation_id,
+            session_id=existing.session_id,
+            source_type=existing.source_type,
+            source_entity_id=existing.source_entity_id,
             source_language=source.source_language,
-            target_language=row["target_language"],
+            target_language=existing.target_language,
             provider=self._provider_name(),
             model_name=self._model_name(),
             source_items=source.items,
         )
-        return TranslationData.from_row(row)
 
     def create_translation(
         self,
@@ -88,8 +87,8 @@ class TranslationService:
             source_entity_id=source_entity_id,
             target_language=target,
         )
-        row = self._repository.upsert_translation(
-            translation_id=existing["translation_id"] if existing else uuid.uuid4().hex,
+        translation = self._repository.upsert_translation(
+            translation_id=existing.translation_id if existing else uuid.uuid4().hex,
             session_id=session_id or source.session_id,
             source_type=normalized_source_type,
             source_entity_id=source_entity_id,
@@ -99,34 +98,32 @@ class TranslationService:
             model_name=self._model_name(),
             source_items=source.items,
         )
-        data = TranslationData.from_row(row)
-        if not force and data.status_name in {"pending", "generating"} and data.job_id:
-            return data
+        if not force and translation.status_name in {"pending", "generating"} and translation.job_id:
+            return translation
         if (
             not force
-            and data.status_name == "completed"
-            and data.stale_count == 0
-            and data.completed_count == data.item_count
+            and translation.status_name == "completed"
+            and translation.stale_count == 0
+            and translation.completed_count == translation.item_count
         ):
-            return data
+            return translation
 
         job = self._job_service.create_job(
             job_type=TranslationJobHandler.job_type,
             entity_type="translation",
-            entity_id=data.translation_id,
+            entity_id=translation.translation_id,
             payload={
-                "translation_id": data.translation_id,
+                "translation_id": translation.translation_id,
                 "source_type": normalized_source_type,
                 "source_entity_id": source_entity_id,
                 "target_language": target,
             },
         )
-        row = self._repository.set_job_id(
-            translation_id=data.translation_id,
+        return self._repository.set_job_id(
+            translation_id=translation.translation_id,
             job_id=job.job_id,
             status=int(TranslationStatus.GENERATING),
         )
-        return TranslationData.from_row(row)
 
     def translate_item(
         self,
@@ -148,8 +145,8 @@ class TranslationService:
             source_entity_id=source_entity_id,
             target_language=target,
         )
-        row = self._repository.upsert_translation(
-            translation_id=existing["translation_id"] if existing else uuid.uuid4().hex,
+        translation = self._repository.upsert_translation(
+            translation_id=existing.translation_id if existing else uuid.uuid4().hex,
             session_id=session_id or source.session_id,
             source_type=normalized_source_type,
             source_entity_id=source_entity_id,
@@ -159,54 +156,54 @@ class TranslationService:
             model_name=self._model_name(),
             source_items=source.items,
         )
-        item_row = next((item for item in row["items"] if str(item["source_item_key"]) == source_item_key), None)
-        if item_row is None:
+        item = next((it for it in translation.items if it.source_item_key == source_item_key), None)
+        if item is None:
             raise ValueError("translation source item not found")
 
         self._repository.mark_items_generating(
-            translation_id=row["translation_id"],
+            translation_id=translation.translation_id,
             source_item_keys=[source_item_key],
         )
         req = TranslationGenerateRequest(
-            translation_id=str(row["translation_id"]),
-            source_type=str(row["source_type"]),
-            source_entity_id=str(row["source_entity_id"]),
-            source_language=row.get("source_language"),
-            target_language=str(row["target_language"]),
+            translation_id=translation.translation_id,
+            source_type=translation.source_type,
+            source_entity_id=translation.source_entity_id,
+            source_language=translation.source_language,
+            target_language=translation.target_language,
             items=[
                 TranslationRequestItem(
-                    source_item_key=str(item_row["source_item_key"]),
-                    source_seq=item_row.get("source_seq"),
-                    speaker=item_row.get("speaker"),
-                    start_time=item_row.get("start_time"),
-                    end_time=item_row.get("end_time"),
-                    source_text=str(item_row["source_text"]),
-                    source_text_hash=str(item_row["source_text_hash"]),
+                    source_item_key=item.source_item_key,
+                    source_seq=item.source_seq,
+                    speaker=item.speaker,
+                    start_time=item.start_time,
+                    end_time=item.end_time,
+                    source_text=item.source_text,
+                    source_text_hash=item.source_text_hash,
                 )
             ],
         )
         try:
             suggestions = {
-                item.source_item_key: item.translated_text
-                for item in self._generator.generate(req)
-                if item.source_item_key == source_item_key
+                suggestion.source_item_key: suggestion.translated_text
+                for suggestion in self._generator.generate(req)
+                if suggestion.source_item_key == source_item_key
             }
             if source_item_key not in suggestions:
                 raise RuntimeError("translation provider returned no item result")
 
-            final_row = self._repository.apply_suggestions(
-                translation_id=str(row["translation_id"]),
+            final = self._repository.apply_suggestions(
+                translation_id=translation.translation_id,
                 suggestions=suggestions,
             )
-            if int(final_row["item_count"]) > 0 and int(final_row["completed_count"]) == int(final_row["item_count"]):
-                final_row = self._repository.mark_completed(
-                    translation_id=str(row["translation_id"]),
+            if final.item_count > 0 and final.completed_count == final.item_count:
+                final = self._repository.mark_completed(
+                    translation_id=translation.translation_id,
                     raw_result={"translated_count": 1},
                 )
-            return TranslationData.from_row(final_row)
+            return final
         except Exception as exc:
             self._repository.mark_items_failed(
-                translation_id=str(row["translation_id"]),
+                translation_id=translation.translation_id,
                 source_item_keys=[source_item_key],
                 error_code="translation_item_generation_failed",
                 error_message=str(exc),
@@ -214,28 +211,28 @@ class TranslationService:
             raise RuntimeError(f"Failed to translate item: {exc}") from exc
 
     def run_generation_job(self, *, translation_id: str, job_id: str) -> JobRunResult:
-        row = self._repository.get_translation_by_id(translation_id)
-        if row is None:
+        translation = self._repository.get_translation_by_id(translation_id)
+        if translation is None:
             return JobRunResult(status=JobStatus.FAILED, error_code="TRANSLATION_NOT_FOUND", error_message="translation not found")
-        if str(row.get("job_id") or "") != job_id:
+        if (translation.job_id or "") != job_id:
             return JobRunResult(status=JobStatus.CANCELED, error_message="translation job superseded")
 
-        source = self._load_source_items(source_type=row["source_type"], source_entity_id=row["source_entity_id"])
-        row = self._repository.upsert_translation(
-            translation_id=row["translation_id"],
-            session_id=row.get("session_id") or source.session_id,
-            source_type=row["source_type"],
-            source_entity_id=row["source_entity_id"],
+        source = self._load_source_items(source_type=translation.source_type, source_entity_id=translation.source_entity_id)
+        translation = self._repository.upsert_translation(
+            translation_id=translation.translation_id,
+            session_id=translation.session_id or source.session_id,
+            source_type=translation.source_type,
+            source_entity_id=translation.source_entity_id,
             source_language=source.source_language,
-            target_language=row["target_language"],
+            target_language=translation.target_language,
             provider=self._provider_name(),
             model_name=self._model_name(),
             source_items=source.items,
         )
         pending_items = [
             item
-            for item in row["items"]
-            if int(item["status"]) in {
+            for item in translation.items
+            if item.status in {
                 int(TranslationItemStatus.PENDING),
                 int(TranslationItemStatus.GENERATING),
                 int(TranslationItemStatus.STALE),
@@ -243,7 +240,7 @@ class TranslationService:
             }
         ]
         if not pending_items:
-            if int(row["item_count"]) > 0 and int(row["completed_count"]) == int(row["item_count"]):
+            if translation.item_count > 0 and translation.completed_count == translation.item_count:
                 self._repository.mark_completed(translation_id=translation_id)
                 return JobRunResult(status=JobStatus.COMPLETED, progress=100)
             self._repository.mark_partial(
@@ -254,23 +251,23 @@ class TranslationService:
 
         self._repository.mark_items_generating(
             translation_id=translation_id,
-            source_item_keys=[str(item["source_item_key"]) for item in pending_items],
+            source_item_keys=[item.source_item_key for item in pending_items],
         )
         req = TranslationGenerateRequest(
             translation_id=translation_id,
-            source_type=str(row["source_type"]),
-            source_entity_id=str(row["source_entity_id"]),
-            source_language=row.get("source_language"),
-            target_language=str(row["target_language"]),
+            source_type=translation.source_type,
+            source_entity_id=translation.source_entity_id,
+            source_language=translation.source_language,
+            target_language=translation.target_language,
             items=[
                 TranslationRequestItem(
-                    source_item_key=str(item["source_item_key"]),
-                    source_seq=item.get("source_seq"),
-                    speaker=item.get("speaker"),
-                    start_time=item.get("start_time"),
-                    end_time=item.get("end_time"),
-                    source_text=str(item["source_text"]),
-                    source_text_hash=str(item["source_text_hash"]),
+                    source_item_key=item.source_item_key,
+                    source_seq=item.source_seq,
+                    speaker=item.speaker,
+                    start_time=item.start_time,
+                    end_time=item.end_time,
+                    source_text=item.source_text,
+                    source_text_hash=item.source_text_hash,
                 )
                 for item in pending_items
             ],
@@ -278,14 +275,14 @@ class TranslationService:
         try:
             all_suggestions: dict[str, str] = {}
             for suggestions in self._generator.generate_progressively(req):
-                batch = {item.source_item_key: item.translated_text for item in suggestions}
+                batch = {suggestion.source_item_key: suggestion.translated_text for suggestion in suggestions}
                 all_suggestions.update(batch)
                 self._repository.apply_suggestions(translation_id=translation_id, suggestions=batch)
 
-            final_row = self._repository.get_translation_by_id(translation_id)
-            if final_row is None:
+            final = self._repository.get_translation_by_id(translation_id)
+            if final is None:
                 return JobRunResult(status=JobStatus.FAILED, error_code="TRANSLATION_NOT_FOUND", error_message="translation not found")
-            if int(final_row["completed_count"]) == int(final_row["item_count"]):
+            if final.completed_count == final.item_count:
                 self._repository.mark_completed(translation_id=translation_id, raw_result={"translated_count": len(all_suggestions)})
                 return JobRunResult(status=JobStatus.COMPLETED, progress=100)
 

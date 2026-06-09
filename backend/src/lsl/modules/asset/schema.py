@@ -52,7 +52,7 @@ class CompleteUploadResponseData(BaseModel):
     status: str = "acknowledged"
 
 
-class AssetListItemData(BaseModel):
+class AssetData(BaseModel):
     object_key: str
     category: str
     entity_id: str
@@ -62,6 +62,9 @@ class AssetListItemData(BaseModel):
     etag: str | None = None
     upload_status: int
     created_at: datetime
+
+
+class AssetListItemData(AssetData):
     asset_url: str
 
 

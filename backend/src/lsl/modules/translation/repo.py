@@ -10,7 +10,14 @@ from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import selectinload, sessionmaker
 
 from lsl.modules.translation.model import TranslationItemModel, TranslationModel
-from lsl.modules.translation.types import TranslationItemStatus, TranslationSourceItem, TranslationStatus
+from lsl.modules.translation.schema import TranslationData, TranslationItemData
+from lsl.modules.translation.types import (
+    TranslationItemStatus,
+    TranslationSourceItem,
+    TranslationStatus,
+    translation_item_status_to_name,
+    translation_status_to_name,
+)
 
 
 class TranslationRepository:
@@ -25,7 +32,7 @@ class TranslationRepository:
         finally:
             db.close()
 
-    def get_translation_by_id(self, translation_id: str) -> dict[str, Any] | None:
+    def get_translation_by_id(self, translation_id: str) -> TranslationData | None:
         normalized_translation_id = self._parse_uuid_str(translation_id)
         if normalized_translation_id is None:
             return None
@@ -38,7 +45,7 @@ class TranslationRepository:
         try:
             with self._session_scope() as db:
                 model = db.execute(stmt).scalar_one_or_none()
-                return self._to_row(model) if model is not None else None
+                return self._to_data(model) if model is not None else None
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query translation by id: {exc}") from exc
 
@@ -48,7 +55,7 @@ class TranslationRepository:
         source_type: str,
         source_entity_id: str,
         target_language: str,
-    ) -> dict[str, Any] | None:
+    ) -> TranslationData | None:
         stmt = (
             select(TranslationModel)
             .options(selectinload(TranslationModel.items))
@@ -62,7 +69,7 @@ class TranslationRepository:
         try:
             with self._session_scope() as db:
                 model = db.execute(stmt).scalar_one_or_none()
-                return self._to_row(model) if model is not None else None
+                return self._to_data(model) if model is not None else None
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query translation by source: {exc}") from exc
 
@@ -78,7 +85,7 @@ class TranslationRepository:
         provider: str,
         model_name: str | None,
         source_items: list[TranslationSourceItem],
-    ) -> dict[str, Any]:
+    ) -> TranslationData:
         normalized_translation_id = self._require_uuid(translation_id, field_name="translation_id")
         normalized_session_id = self._require_uuid(session_id, field_name="session_id") if session_id else None
         try:
@@ -153,11 +160,11 @@ class TranslationRepository:
                 db.commit()
                 db.refresh(model)
                 _ = list(model.items)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to upsert translation: {exc}") from exc
 
-    def set_job_id(self, *, translation_id: str, job_id: str | None, status: int) -> dict[str, Any]:
+    def set_job_id(self, *, translation_id: str, job_id: str | None, status: int) -> TranslationData:
         normalized_translation_id = self._require_uuid(translation_id, field_name="translation_id")
         normalized_job_id = self._require_uuid(job_id, field_name="job_id") if job_id is not None else None
         try:
@@ -170,7 +177,7 @@ class TranslationRepository:
                 db.commit()
                 db.refresh(model)
                 _ = list(model.items)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to set translation job id: {exc}") from exc
 
@@ -198,7 +205,7 @@ class TranslationRepository:
         *,
         translation_id: str,
         suggestions: dict[str, str],
-    ) -> dict[str, Any]:
+    ) -> TranslationData:
         normalized_translation_id = self._require_uuid(translation_id, field_name="translation_id")
         try:
             with self._session_scope() as db:
@@ -215,7 +222,7 @@ class TranslationRepository:
                 db.commit()
                 db.refresh(model)
                 _ = list(model.items)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to apply translation suggestions: {exc}") from exc
 
@@ -226,7 +233,7 @@ class TranslationRepository:
         source_item_keys: list[str],
         error_code: str,
         error_message: str | None,
-    ) -> dict[str, Any]:
+    ) -> TranslationData:
         normalized_translation_id = self._require_uuid(translation_id, field_name="translation_id")
         try:
             with self._session_scope() as db:
@@ -241,11 +248,11 @@ class TranslationRepository:
                 db.commit()
                 db.refresh(model)
                 _ = list(model.items)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark translation items failed: {exc}") from exc
 
-    def mark_completed(self, *, translation_id: str, raw_result: dict[str, Any] | None = None) -> dict[str, Any]:
+    def mark_completed(self, *, translation_id: str, raw_result: dict[str, Any] | None = None) -> TranslationData:
         return self._mark_terminal(
             translation_id=translation_id,
             status=int(TranslationStatus.COMPLETED),
@@ -254,7 +261,7 @@ class TranslationRepository:
             raw_result=raw_result,
         )
 
-    def mark_partial(self, *, translation_id: str, error_message: str | None = None) -> dict[str, Any]:
+    def mark_partial(self, *, translation_id: str, error_message: str | None = None) -> TranslationData:
         return self._mark_terminal(
             translation_id=translation_id,
             status=int(TranslationStatus.PARTIAL),
@@ -263,7 +270,7 @@ class TranslationRepository:
             raw_result=None,
         )
 
-    def mark_failed(self, *, translation_id: str, error_code: str, error_message: str | None) -> dict[str, Any]:
+    def mark_failed(self, *, translation_id: str, error_code: str, error_message: str | None) -> TranslationData:
         return self._mark_terminal(
             translation_id=translation_id,
             status=int(TranslationStatus.FAILED),
@@ -280,7 +287,7 @@ class TranslationRepository:
         error_code: str | None,
         error_message: str | None,
         raw_result: dict[str, Any] | None,
-    ) -> dict[str, Any]:
+    ) -> TranslationData:
         normalized_translation_id = self._require_uuid(translation_id, field_name="translation_id")
         try:
             with self._session_scope() as db:
@@ -309,7 +316,7 @@ class TranslationRepository:
                 db.commit()
                 db.refresh(model)
                 _ = list(model.items)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark translation terminal: {exc}") from exc
 
@@ -341,46 +348,49 @@ class TranslationRepository:
             model.status = int(TranslationStatus.PENDING)
 
     @staticmethod
-    def _to_row(model: TranslationModel) -> dict[str, Any]:
-        return {
-            "translation_id": model.translation_id,
-            "session_id": model.session_id,
-            "source_type": model.source_type,
-            "source_entity_id": model.source_entity_id,
-            "source_language": model.source_language,
-            "target_language": model.target_language,
-            "job_id": model.job_id,
-            "provider": model.provider,
-            "model": model.model,
-            "status": int(model.status),
-            "item_count": int(model.item_count),
-            "completed_count": int(model.completed_count),
-            "stale_count": int(model.stale_count),
-            "error_code": model.error_code,
-            "error_message": model.error_message,
-            "created_at": model.created_at,
-            "updated_at": model.updated_at,
-            "items": [
-                {
-                    "item_id": item.item_id,
-                    "translation_id": item.translation_id,
-                    "source_item_key": item.source_item_key,
-                    "source_seq": item.source_seq,
-                    "speaker": item.speaker,
-                    "start_time": item.start_time,
-                    "end_time": item.end_time,
-                    "source_text": item.source_text,
-                    "source_text_hash": item.source_text_hash,
-                    "translated_text": item.translated_text,
-                    "status": int(item.status),
-                    "error_code": item.error_code,
-                    "error_message": item.error_message,
-                    "created_at": item.created_at,
-                    "updated_at": item.updated_at,
-                }
+    def _to_data(model: TranslationModel) -> TranslationData:
+        status = int(model.status)
+        return TranslationData(
+            translation_id=model.translation_id,
+            session_id=model.session_id,
+            source_type=model.source_type,
+            source_entity_id=model.source_entity_id,
+            source_language=model.source_language,
+            target_language=model.target_language,
+            job_id=model.job_id,
+            provider=model.provider,
+            model=model.model,
+            status=status,
+            status_name=translation_status_to_name(status),
+            item_count=int(model.item_count),
+            completed_count=int(model.completed_count),
+            stale_count=int(model.stale_count),
+            error_code=model.error_code,
+            error_message=model.error_message,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+            items=[
+                TranslationItemData(
+                    item_id=item.item_id,
+                    translation_id=item.translation_id,
+                    source_item_key=item.source_item_key,
+                    source_seq=item.source_seq,
+                    speaker=item.speaker,
+                    start_time=item.start_time,
+                    end_time=item.end_time,
+                    source_text=item.source_text,
+                    source_text_hash=item.source_text_hash,
+                    translated_text=item.translated_text,
+                    status=int(item.status),
+                    status_name=translation_item_status_to_name(int(item.status)),
+                    error_code=item.error_code,
+                    error_message=item.error_message,
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                )
                 for item in sorted(model.items, key=lambda value: (value.source_seq is None, value.source_seq or 0, value.source_item_key))
             ],
-        }
+        )
 
     @staticmethod
     def _source_hash(text: str) -> str:

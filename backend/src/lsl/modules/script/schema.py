@@ -115,10 +115,6 @@ class ScriptGenerationData(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "ScriptGenerationData":
-        return cls(**row)
-
 
 class ScriptGenerationPreviewItemData(BaseModel):
     seq: int

@@ -63,10 +63,6 @@ class AsrRecognitionData(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    @classmethod
-    def from_row(cls, row: dict) -> AsrRecognitionData:
-        return cls(**row)
-
 
 class CreateAsrRecognitionData(BaseModel):
     recognition: AsrRecognitionData

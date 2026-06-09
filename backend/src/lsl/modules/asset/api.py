@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from lsl.modules.asset.schema import (
     ApiResponse,
-    AssetListItemData,
     AssetListResponseData,
     CompleteUploadRequest,
     CompleteUploadResponseData,
@@ -61,7 +60,7 @@ def list_assets(
     asset_service: AssetService = Depends(get_asset_service),
 ):
     try:
-        rows = asset_service.list_assets(
+        items = asset_service.list_assets(
             limit=limit,
             category=category,
             entity_id=entity_id,
@@ -71,7 +70,6 @@ def list_assets(
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    items = [AssetListItemData(**row) for row in rows]
     return ApiResponse(data=AssetListResponseData(items=items))
 
 

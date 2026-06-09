@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import sessionmaker
 
 from lsl.modules.script.model import ScriptGenerationModel
+from lsl.modules.script.schema import ScriptGenerationData
 from lsl.modules.script.types import ScriptGenerationStatus, script_generation_status_to_name
 
 
@@ -41,7 +42,7 @@ class ScriptRepository:
         difficulty: str | None,
         cue_style: str | None,
         must_include: list[str],
-    ) -> dict[str, Any]:
+    ) -> ScriptGenerationData:
         model = ScriptGenerationModel(
             generation_id=self._require_uuid(generation_id, field_name="generation_id"),
             session_id=self._require_uuid(session_id, field_name="session_id"),
@@ -63,7 +64,7 @@ class ScriptRepository:
                 db.add(model)
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to create script generation: {exc}") from exc
 
@@ -76,7 +77,7 @@ class ScriptRepository:
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to set script generation job id: {exc}") from exc
 
-    def get_generation_by_id(self, generation_id: str) -> dict[str, Any] | None:
+    def get_generation_by_id(self, generation_id: str) -> ScriptGenerationData | None:
         normalized = self._parse_uuid_str(generation_id)
         if normalized is None:
             return None
@@ -84,11 +85,11 @@ class ScriptRepository:
         try:
             with self._session_scope() as db:
                 model = db.execute(stmt).scalar_one_or_none()
-                return self._to_row(model) if model is not None else None
+                return self._to_data(model) if model is not None else None
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to query script generation: {exc}") from exc
 
-    def mark_generating(self, *, generation_id: str) -> dict[str, Any]:
+    def mark_generating(self, *, generation_id: str) -> ScriptGenerationData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_generation(db, generation_id)
@@ -100,7 +101,7 @@ class ScriptRepository:
                 model.error_message = None
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark script generation running: {exc}") from exc
 
@@ -109,7 +110,7 @@ class ScriptRepository:
         *,
         generation_id: str,
         sections: list[dict[str, Any]],
-    ) -> dict[str, Any]:
+    ) -> ScriptGenerationData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_generation(db, generation_id)
@@ -118,7 +119,7 @@ class ScriptRepository:
                 model.raw_result_json = {**current_raw_result, "stage": "generating"}
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to save script generation plan sections: {exc}") from exc
 
@@ -168,7 +169,7 @@ class ScriptRepository:
         generation_id: str,
         transcript_id: str,
         raw_result_json: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> ScriptGenerationData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_generation(db, generation_id)
@@ -179,11 +180,11 @@ class ScriptRepository:
                 model.error_message = None
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark script generation completed: {exc}") from exc
 
-    def mark_failed(self, *, generation_id: str, error_code: str | None, error_message: str | None) -> dict[str, Any]:
+    def mark_failed(self, *, generation_id: str, error_code: str | None, error_message: str | None) -> ScriptGenerationData:
         try:
             with self._session_scope() as db:
                 model = self._get_required_generation(db, generation_id)
@@ -192,7 +193,7 @@ class ScriptRepository:
                 model.error_message = error_message
                 db.commit()
                 db.refresh(model)
-                return self._to_row(model)
+                return self._to_data(model)
         except SQLAlchemyError as exc:  # pragma: no cover
             raise RuntimeError(f"Failed to mark script generation failed: {exc}") from exc
 
@@ -204,34 +205,33 @@ class ScriptRepository:
         return model
 
     @staticmethod
-    def _to_row(model: ScriptGenerationModel) -> dict[str, Any]:
+    def _to_data(model: ScriptGenerationModel) -> ScriptGenerationData:
         status = int(model.status)
-        return {
-            "generation_id": model.generation_id,
-            "session_id": model.session_id,
-            "transcript_id": model.transcript_id,
-            "job_id": model.job_id,
-            "provider": model.provider,
-            "title": model.title,
-            "description": model.description,
-            "target_language": model.target_language,
-            "cue_language": model.cue_language,
-            "prompt": model.prompt,
-            "turn_count": int(model.turn_count),
-            "speaker_count": int(model.speaker_count),
-            "difficulty": model.difficulty,
-            "cue_style": model.cue_style,
-            "must_include": list(model.must_include_json or []),
-            "preview_items": ScriptRepository._normalize_preview_items(model.preview_items_json),
-            "plan_sections": ScriptRepository._normalize_plan_sections(model.plan_sections_json),
-            "raw_result": model.raw_result_json,
-            "status": status,
-            "status_name": script_generation_status_to_name(status),
-            "error_code": model.error_code,
-            "error_message": model.error_message,
-            "created_at": model.created_at,
-            "updated_at": model.updated_at,
-        }
+        return ScriptGenerationData(
+            generation_id=model.generation_id,
+            session_id=model.session_id,
+            transcript_id=model.transcript_id,
+            job_id=model.job_id,
+            provider=model.provider,
+            title=model.title,
+            description=model.description,
+            target_language=model.target_language,
+            cue_language=model.cue_language,
+            prompt=model.prompt,
+            turn_count=int(model.turn_count),
+            speaker_count=int(model.speaker_count),
+            difficulty=model.difficulty,
+            cue_style=model.cue_style,
+            must_include=list(model.must_include_json or []),
+            plan_sections=ScriptRepository._normalize_plan_sections(model.plan_sections_json),
+            raw_result=model.raw_result_json,
+            status=status,
+            status_name=script_generation_status_to_name(status),
+            error_code=model.error_code,
+            error_message=model.error_message,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
 
     @staticmethod
     def _parse_uuid_str(value: str) -> str | None:

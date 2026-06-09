@@ -10,6 +10,7 @@ import requests
 
 from lsl.core.config import Settings
 from lsl.modules.asset.repo import AssetRepository
+from lsl.modules.asset.schema import AssetData, AssetListItemData
 from lsl.modules.asset.types import StorageProvider
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,7 @@ class AssetService:
         limit: int = 20,
         category: Optional[str] = None,
         entity_id: Optional[str] = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[AssetListItemData]:
         if self._repository is None:
             raise RuntimeError("Asset repository is not configured. Set DATABASE_URL to enable persistence.")
         if limit <= 0:
@@ -210,20 +211,14 @@ class AssetService:
         if limit > 100:
             raise ValueError("limit must be less than or equal to 100")
 
-        rows = self._repository.list_assets(
+        assets = self._repository.list_assets(
             limit=limit,
             category=category,
             entity_id=entity_id,
         )
+        return [self._with_asset_url(asset) for asset in assets]
 
-        items: list[dict[str, Any]] = []
-        for row in rows:
-            item = dict(row)
-            item["asset_url"] = self.build_asset_url(item["object_key"])
-            items.append(item)
-        return items
-
-    def get_asset_by_object_key(self, *, object_key: str) -> dict[str, Any]:
+    def get_asset_by_object_key(self, *, object_key: str) -> AssetListItemData:
         if self._repository is None:
             raise RuntimeError("Asset repository is not configured. Set DATABASE_URL to enable persistence.")
 
@@ -231,15 +226,13 @@ class AssetService:
         if not normalized:
             raise ValueError("object_key is required")
 
-        row = self._repository.get_asset_by_object_key(object_key=normalized)
-        if row is None:
+        asset = self._repository.get_asset_by_object_key(object_key=normalized)
+        if asset is None:
             raise ValueError("asset not found")
 
-        item = dict(row)
-        item["asset_url"] = self.build_asset_url(item["object_key"])
-        return item
+        return self._with_asset_url(asset)
 
-    def list_assets_by_object_keys(self, *, object_keys: list[str]) -> dict[str, dict[str, Any]]:
+    def list_assets_by_object_keys(self, *, object_keys: list[str]) -> dict[str, AssetListItemData]:
         if self._repository is None:
             raise RuntimeError("Asset repository is not configured. Set DATABASE_URL to enable persistence.")
 
@@ -247,13 +240,11 @@ class AssetService:
         if not normalized:
             return {}
 
-        rows = self._repository.list_assets_by_object_keys(object_keys=normalized)
-        result: dict[str, dict[str, Any]] = {}
-        for row in rows:
-            item = dict(row)
-            item["asset_url"] = self.build_asset_url(item["object_key"])
-            result[str(item["object_key"])] = item
-        return result
+        assets = self._repository.list_assets_by_object_keys(object_keys=normalized)
+        return {asset.object_key: self._with_asset_url(asset) for asset in assets}
+
+    def _with_asset_url(self, asset: AssetData) -> AssetListItemData:
+        return AssetListItemData(**asset.model_dump(), asset_url=self.build_asset_url(asset.object_key))
 
     @staticmethod
     def _parse_category_and_entity(object_key: str) -> tuple[str, str]:
