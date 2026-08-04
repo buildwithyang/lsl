@@ -96,6 +96,16 @@ export function Revise() {
     sessionId: id,
     targetLanguage: language,
     enabled: !!revisionId && revision.length > 0 && !isRevising,
+    getSourceItems: useCallback(() => {
+      return revision.map((item, index) => ({
+        source_item_key: item.id,
+        source_seq: index,
+        speaker: item.speaker,
+        start_time: item.startTime,
+        end_time: item.endTime,
+        source_text: item.fullText,
+      }))
+    }, [revision]),
   });
   const revisionProgress = useMemo(
     () => buildRevisionProgress(revisionTranscript, revision, revisionPlanSections),
@@ -423,75 +433,52 @@ export function Revise() {
 
   const handleUpdateTranslation = useCallback(async (itemId?: string) => {
     setIsStartingTranslation(true);
-    const requestedItemIds = itemId
-      ? [itemId]
-      : [
-          ...new Set([
-            ...dirtyTranslationItemVersionsRef.current.keys(),
-            ...(revisionTranslation.translation?.items ?? [])
-              .filter((item) => item.status_name === 'stale')
-              .map((item) => item.source_item_key),
-          ]),
-        ];
-    if (requestedItemIds.length > 0) {
-      setSyncingTranslationItemIds((prev) => {
-        const next = new Set(prev);
-        requestedItemIds.forEach((id) => next.add(id));
-        return next;
-      });
-    }
     try {
       await flushRevisionDraftSaves();
-      if (requestedItemIds.length > 0) {
-        const flushedDirtyVersions = new Map(
-          requestedItemIds.map((id) => [id, dirtyTranslationItemVersionsRef.current.get(id)])
-        );
-        let translated = false;
-        for (const requestedItemId of requestedItemIds) {
-          const data = await revisionTranslation.translateItem(requestedItemId);
-          if (!data) {
-            throw new Error(t('error.updateTranslation'));
-          }
-          translated = translated || !!data;
+      if (itemId) {
+        const revItem = revision.find((r) => r.id === itemId);
+        if (!revItem) {
+          throw new Error(t('error.updateTranslation'));
         }
-        if (translated) {
-          flushedDirtyVersions.forEach((version, requestedItemId) => {
-            const currentVersion = dirtyTranslationItemVersionsRef.current.get(requestedItemId);
-            if (version === undefined ? currentVersion === undefined : currentVersion === version) {
-              dirtyTranslationItemVersionsRef.current.delete(requestedItemId);
-            }
-          });
-          setDirtyTranslationItemIds(new Set(dirtyTranslationItemVersionsRef.current.keys()));
-        }
-        return;
-      }
-
-      const flushedDirtyVersions = new Map(dirtyTranslationItemVersionsRef.current);
-      const data = await revisionTranslation.retry();
-      if (!data) {
-        throw new Error(t('error.updateTranslation'));
-      }
-      if (data) {
-        flushedDirtyVersions.forEach((version, itemId) => {
-          if (dirtyTranslationItemVersionsRef.current.get(itemId) === version) {
-            dirtyTranslationItemVersionsRef.current.delete(itemId);
-          }
+        setSyncingTranslationItemIds((prev) => {
+          const next = new Set(prev);
+          next.add(itemId);
+          return next;
         });
+        const data = await revisionTranslation.translateItem({
+          source_item_key: revItem.id,
+          source_seq: revision.indexOf(revItem),
+          speaker: revItem.speaker,
+          start_time: revItem.startTime,
+          end_time: revItem.endTime,
+          source_text: revItem.fullText,
+        });
+        if (!data) {
+          throw new Error(t('error.updateTranslation'));
+        }
+        dirtyTranslationItemVersionsRef.current.delete(itemId);
         setDirtyTranslationItemIds(new Set(dirtyTranslationItemVersionsRef.current.keys()));
+      } else {
+        const data = await revisionTranslation.retry();
+        if (!data) {
+          throw new Error(t('error.updateTranslation'));
+        }
+        dirtyTranslationItemVersionsRef.current.clear();
+        setDirtyTranslationItemIds(new Set());
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('error.saveRevisionItem'));
     } finally {
       setIsStartingTranslation(false);
-      if (requestedItemIds.length > 0) {
+      if (itemId) {
         setSyncingTranslationItemIds((prev) => {
           const next = new Set(prev);
-          requestedItemIds.forEach((id) => next.delete(id));
+          next.delete(itemId);
           return next;
         });
       }
     }
-  }, [flushRevisionDraftSaves, revisionTranslation, t]);
+  }, [flushRevisionDraftSaves, revisionTranslation, revision, t]);
 
   const handleReviseByAI = useCallback(async () => {
     if (!id) return;
@@ -572,8 +559,7 @@ export function Revise() {
     setError(null);
     try {
       await flushRevisionDraftSaves();
-      const shouldUpdateTranslation = revisionTranslation.needsUpdate || dirtyTranslationItemVersionsRef.current.size > 0;
-      if (shouldUpdateTranslation) {
+      if (dirtyTranslationItemVersionsRef.current.size > 0) {
         await handleUpdateTranslation();
       }
 
@@ -614,7 +600,6 @@ export function Revise() {
   }, [
     id,
     flushRevisionDraftSaves,
-    revisionTranslation.needsUpdate,
     handleUpdateTranslation,
     format,
     emotionScale,
@@ -777,7 +762,7 @@ export function Revise() {
   const isScriptGenerationRoute = revision.length === 0 && session?.type === 'ai_script' && (isPreparingScript || !!scriptJobId || !!scriptGenerationId);
   const isWaitingForScript = isScriptGenerationRoute && !error;
   const shouldShowRevisionControls = !isScriptGenerationRoute;
-  const translationNeedsUpdate = revisionTranslation.needsUpdate || dirtyTranslationItemIds.size > 0;
+  const translationNeedsUpdate = dirtyTranslationItemIds.size > 0;
   const isTranslationBusy = isStartingTranslation || revisionTranslation.isTranslating;
 
   if (!session && !notFound) {
@@ -814,9 +799,8 @@ export function Revise() {
             active={showAllTranslations}
             isTranslating={isTranslationBusy}
             failed={revisionTranslation.translation?.status_name === 'failed' || revisionTranslation.hasStuckItems}
-            needsUpdate={translationNeedsUpdate}
             onClick={() => {
-              if (revisionTranslation.translation?.status_name === 'failed' || translationNeedsUpdate || revisionTranslation.hasStuckItems) {
+              if (revisionTranslation.translation?.status_name === 'failed' || revisionTranslation.hasStuckItems) {
                 void handleUpdateTranslation();
                 return;
               }
@@ -1009,7 +993,7 @@ export function Revise() {
                   ? 'failed'
                   : translationItem?.status_name ?? revisionTranslation.translation?.status_name
               }
-              translationStale={translationItemDirty || translationItem?.status_name === 'stale'}
+              translationStale={translationItemDirty}
               showTranslation={showAllTranslations}
               onRetryTranslation={() => void handleUpdateTranslation(item.id)}
               showAssessment={session.type !== 'ai_script'}

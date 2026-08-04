@@ -10,8 +10,21 @@ from lsl.modules.translation.schema import (
     CreateTranslationRequest,
     TranslateTranslationItemRequest,
     TranslationData,
+    TranslationSourceItemPayload,
 )
 from lsl.modules.translation.service import TranslationService
+from lsl.modules.translation.types import TranslationSourceItem
+
+
+def _to_source_item(payload: TranslationSourceItemPayload) -> TranslationSourceItem:
+    return TranslationSourceItem(
+        source_item_key=payload.source_item_key,
+        source_seq=payload.source_seq,
+        speaker=payload.speaker,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        source_text=payload.source_text,
+    )
 
 router = APIRouter(prefix="/translations", tags=["translations"])
 
@@ -32,14 +45,14 @@ def create_translation(
         translation = translation_service.create_translation(
             source_type=payload.source_type,
             source_entity_id=payload.source_entity_id,
+            items=[_to_source_item(item) for item in payload.items],
             session_id=payload.session_id,
+            source_language=payload.source_language,
             target_language=payload.target_language,
             force=payload.force,
         )
     except ValueError as exc:
-        detail = str(exc)
-        status_code = 404 if detail in {"transcript not found", "revision not found"} else 400
-        raise HTTPException(status_code=status_code, detail=detail) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return ApiResponse(data=translation)
@@ -54,13 +67,14 @@ def translate_item(
         translation = translation_service.translate_item(
             source_type=payload.source_type,
             source_entity_id=payload.source_entity_id,
-            source_item_key=payload.source_item_key,
+            item=_to_source_item(payload.item),
             session_id=payload.session_id,
+            source_language=payload.source_language,
             target_language=payload.target_language,
         )
     except ValueError as exc:
         detail = str(exc)
-        status_code = 404 if detail in {"transcript not found", "revision not found", "translation source item not found"} else 400
+        status_code = 404 if detail == "translation source item not found" else 400
         raise HTTPException(status_code=status_code, detail=detail) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

@@ -7,10 +7,20 @@ interface ApiResponse<T> {
   data: T
 }
 
+export interface TranslationSourceItemInput {
+  source_item_key: string
+  source_seq?: number | null
+  speaker?: string | null
+  start_time?: number | null
+  end_time?: number | null
+  source_text: string
+}
+
 export interface TranslationSourceParams {
   sourceType: 'transcript' | 'revision'
   sourceEntityId: string
   sessionId?: string
+  sourceLanguage?: string
   targetLanguage?: string
 }
 
@@ -29,7 +39,9 @@ export async function getTranslation(params: TranslationSourceParams): Promise<T
   return response.data
 }
 
-export async function createTranslation(params: TranslationSourceParams & { force?: boolean }): Promise<TranslationResponse> {
+export async function createTranslation(
+  params: TranslationSourceParams & { items: TranslationSourceItemInput[]; force?: boolean }
+): Promise<TranslationResponse> {
   const response = await requestJson<ApiResponse<TranslationResponse>>('/translations', {
     method: 'POST',
     headers: {
@@ -39,14 +51,18 @@ export async function createTranslation(params: TranslationSourceParams & { forc
       source_type: params.sourceType,
       source_entity_id: params.sourceEntityId,
       session_id: params.sessionId,
+      source_language: params.sourceLanguage,
       target_language: params.targetLanguage,
+      items: params.items,
       force: params.force ?? false,
     }),
   })
   return response.data
 }
 
-export async function translateTranslationItem(params: TranslationSourceParams & { sourceItemKey: string }): Promise<TranslationResponse> {
+export async function translateTranslationItem(
+  params: TranslationSourceParams & { item: TranslationSourceItemInput }
+): Promise<TranslationResponse> {
   const response = await requestJson<ApiResponse<TranslationResponse>>('/translations/items/translate', {
     method: 'POST',
     headers: {
@@ -55,9 +71,10 @@ export async function translateTranslationItem(params: TranslationSourceParams &
     body: JSON.stringify({
       source_type: params.sourceType,
       source_entity_id: params.sourceEntityId,
-      source_item_key: params.sourceItemKey,
       session_id: params.sessionId,
+      source_language: params.sourceLanguage,
       target_language: params.targetLanguage,
+      item: params.item,
     }),
   })
   return response.data

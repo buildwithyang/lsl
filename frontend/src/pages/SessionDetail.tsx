@@ -39,8 +39,19 @@ export function SessionDetail() {
     sourceType: 'transcript',
     sourceEntityId: currentTranscriptId,
     sessionId: session?.id,
+    sourceLanguage: session?.targetLanguage,
     targetLanguage: language,
     enabled: !!currentTranscriptId && !!session?.transcript && session.transcript.length > 0,
+    getSourceItems: useCallback(() => {
+      return (session?.transcript || []).map((item, index) => ({
+        source_item_key: item.id,
+        source_seq: index,
+        speaker: item.speaker,
+        start_time: item.startTime,
+        end_time: item.endTime,
+        source_text: item.text,
+      }))
+    }, [session?.transcript]),
   });
 
   useEffect(() => {
@@ -246,9 +257,8 @@ export function SessionDetail() {
                 active={showTranslation}
                 isTranslating={transcriptTranslation.isTranslating}
                 failed={transcriptTranslation.translation?.status_name === 'failed' || transcriptTranslation.hasStuckItems}
-                needsUpdate={transcriptTranslation.needsUpdate}
                 onClick={() => {
-                  if (transcriptTranslation.translation?.status_name === 'failed' || transcriptTranslation.needsUpdate || transcriptTranslation.hasStuckItems) {
+                  if (transcriptTranslation.translation?.status_name === 'failed' || transcriptTranslation.hasStuckItems) {
                     void transcriptTranslation.retry();
                     return;
                   }

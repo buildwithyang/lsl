@@ -85,6 +85,7 @@ class TranslationRepository:
         provider: str,
         model_name: str | None,
         source_items: list[TranslationSourceItem],
+        remove_missing: bool = True,
     ) -> TranslationData:
         normalized_translation_id = self._require_uuid(translation_id, field_name="translation_id")
         normalized_session_id = self._require_uuid(session_id, field_name="session_id") if session_id else None
@@ -120,12 +121,12 @@ class TranslationRepository:
 
                 existing_by_key = {item.source_item_key: item for item in model.items}
                 incoming_keys = {item.source_item_key for item in source_items}
-                for item in list(model.items):
-                    if item.source_item_key not in incoming_keys:
-                        model.items.remove(item)
+                if remove_missing:
+                    for item in list(model.items):
+                        if item.source_item_key not in incoming_keys:
+                            model.items.remove(item)
 
                 for source_item in source_items:
-                    source_hash = self._source_hash(source_item.source_text)
                     item = existing_by_key.get(source_item.source_item_key)
                     if item is None:
                         model.items.append(
@@ -138,21 +139,20 @@ class TranslationRepository:
                                 start_time=source_item.start_time,
                                 end_time=source_item.end_time,
                                 source_text=source_item.source_text,
-                                source_text_hash=source_hash,
                                 status=int(TranslationItemStatus.PENDING),
                             )
                         )
                         continue
 
-                    changed = item.source_text_hash != source_hash
+                    changed = (item.source_text or "").strip() != (source_item.source_text or "").strip()
                     item.source_seq = source_item.source_seq
                     item.speaker = source_item.speaker
                     item.start_time = source_item.start_time
                     item.end_time = source_item.end_time
                     item.source_text = source_item.source_text
                     if changed:
-                        item.source_text_hash = source_hash
-                        item.status = int(TranslationItemStatus.STALE)
+                        item.translated_text = None
+                        item.status = int(TranslationItemStatus.PENDING)
                         item.error_code = None
                         item.error_message = None
 
@@ -331,18 +331,17 @@ class TranslationRepository:
     def _refresh_counts(model: TranslationModel) -> None:
         model.item_count = len(model.items)
         model.completed_count = sum(1 for item in model.items if int(item.status) == int(TranslationItemStatus.COMPLETED))
-        model.stale_count = sum(1 for item in model.items if int(item.status) == int(TranslationItemStatus.STALE))
         pending_count = sum(1 for item in model.items if int(item.status) == int(TranslationItemStatus.PENDING))
         generating_count = sum(1 for item in model.items if int(item.status) == int(TranslationItemStatus.GENERATING))
         failed_count = sum(1 for item in model.items if int(item.status) == int(TranslationItemStatus.FAILED))
-        unfinished_count = pending_count + generating_count + model.stale_count + failed_count
+        unfinished_count = pending_count + generating_count + failed_count
         if model.item_count > 0 and model.completed_count == model.item_count:
             model.status = int(TranslationStatus.COMPLETED)
         elif model.job_id is not None and unfinished_count > 0:
             model.status = int(TranslationStatus.GENERATING)
         elif failed_count > 0 and unfinished_count == failed_count:
             model.status = int(TranslationStatus.FAILED)
-        elif model.completed_count > 0 or model.stale_count > 0 or failed_count > 0:
+        elif model.completed_count > 0 or failed_count > 0:
             model.status = int(TranslationStatus.PARTIAL)
         elif model.item_count > 0:
             model.status = int(TranslationStatus.PENDING)
@@ -364,7 +363,6 @@ class TranslationRepository:
             status_name=translation_status_to_name(status),
             item_count=int(model.item_count),
             completed_count=int(model.completed_count),
-            stale_count=int(model.stale_count),
             error_code=model.error_code,
             error_message=model.error_message,
             created_at=model.created_at,
@@ -379,7 +377,6 @@ class TranslationRepository:
                     start_time=item.start_time,
                     end_time=item.end_time,
                     source_text=item.source_text,
-                    source_text_hash=item.source_text_hash,
                     translated_text=item.translated_text,
                     status=int(item.status),
                     status_name=translation_item_status_to_name(int(item.status)),
@@ -391,12 +388,6 @@ class TranslationRepository:
                 for item in sorted(model.items, key=lambda value: (value.source_seq is None, value.source_seq or 0, value.source_item_key))
             ],
         )
-
-    @staticmethod
-    def _source_hash(text: str) -> str:
-        import hashlib
-
-        return hashlib.sha256(text.strip().encode("utf-8")).hexdigest()
 
     @staticmethod
     def _parse_uuid_str(value: str | None) -> str | None:

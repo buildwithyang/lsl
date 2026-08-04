@@ -14,11 +14,40 @@ class ApiResponse(BaseModel, Generic[T]):
     data: T
 
 
+class TranslationSourceItemPayload(BaseModel):
+    """A source sentence pushed by the frontend to be translated."""
+
+    source_item_key: str = Field(..., min_length=1, max_length=128)
+    source_seq: int | None = None
+    speaker: str | None = Field(default=None, max_length=64)
+    start_time: int | None = None
+    end_time: int | None = None
+    source_text: str = Field(..., min_length=1)
+
+    @field_validator("source_item_key")
+    @classmethod
+    def normalize_key(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("source_item_key is required")
+        return normalized
+
+    @field_validator("speaker")
+    @classmethod
+    def normalize_speaker(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
 class CreateTranslationRequest(BaseModel):
     source_type: str = Field(..., min_length=1, max_length=32)
     source_entity_id: str = Field(..., min_length=1, max_length=128)
     session_id: str | None = Field(default=None, max_length=64)
+    source_language: str | None = Field(default=None, min_length=2, max_length=16)
     target_language: str | None = Field(default=None, min_length=2, max_length=16)
+    items: list[TranslationSourceItemPayload] = Field(default_factory=list)
     force: bool = False
 
     @field_validator("source_type", "source_entity_id")
@@ -29,7 +58,7 @@ class CreateTranslationRequest(BaseModel):
             raise ValueError("value is required")
         return normalized
 
-    @field_validator("session_id", "target_language")
+    @field_validator("session_id", "source_language", "target_language")
     @classmethod
     def normalize_optional(cls, value: str | None) -> str | None:
         if value is None:
@@ -41,11 +70,12 @@ class CreateTranslationRequest(BaseModel):
 class TranslateTranslationItemRequest(BaseModel):
     source_type: str = Field(..., min_length=1, max_length=32)
     source_entity_id: str = Field(..., min_length=1, max_length=128)
-    source_item_key: str = Field(..., min_length=1, max_length=128)
     session_id: str | None = Field(default=None, max_length=64)
+    source_language: str | None = Field(default=None, min_length=2, max_length=16)
     target_language: str | None = Field(default=None, min_length=2, max_length=16)
+    item: TranslationSourceItemPayload
 
-    @field_validator("source_type", "source_entity_id", "source_item_key")
+    @field_validator("source_type", "source_entity_id")
     @classmethod
     def normalize_required(cls, value: str) -> str:
         normalized = value.strip()
@@ -53,7 +83,7 @@ class TranslateTranslationItemRequest(BaseModel):
             raise ValueError("value is required")
         return normalized
 
-    @field_validator("session_id", "target_language")
+    @field_validator("session_id", "source_language", "target_language")
     @classmethod
     def normalize_optional(cls, value: str | None) -> str | None:
         if value is None:
@@ -71,7 +101,6 @@ class TranslationItemData(BaseModel):
     start_time: int | None = None
     end_time: int | None = None
     source_text: str
-    source_text_hash: str
     translated_text: str | None = None
     status: int
     status_name: str
@@ -95,7 +124,6 @@ class TranslationData(BaseModel):
     status_name: str
     item_count: int
     completed_count: int
-    stale_count: int
     error_code: str | None = None
     error_message: str | None = None
     created_at: datetime

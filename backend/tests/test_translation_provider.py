@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from lsl.modules.translation.provider import LLMTranslationGenerator
-from lsl.modules.translation.types import TranslationGenerateRequest, TranslationRequestItem
+from lsl.modules.translation.types import TranslationGenerateRequest, TranslationSourceItem
 
 
 def test_translation_prompt_keeps_and_translates_bracket_cues() -> None:
@@ -14,14 +14,13 @@ def test_translation_prompt_keeps_and_translates_bracket_cues() -> None:
         source_language="en-US",
         target_language="zh-CN",
         items=[
-            TranslationRequestItem(
+            TranslationSourceItem(
                 source_item_key="item-1",
                 source_seq=0,
                 speaker="user-1",
                 start_time=0,
                 end_time=1000,
                 source_text="[Open with relaxed curiosity] What did you do last weekend?",
-                source_text_hash="hash",
             )
         ],
     )

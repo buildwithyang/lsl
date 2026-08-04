@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createTranslation, getTranslation, isMissingTranslationError, translateTranslationItem } from '@/lib/api/translations'
+import {
+  createTranslation,
+  getTranslation,
+  isMissingTranslationError,
+  translateTranslationItem,
+  type TranslationSourceItemInput,
+} from '@/lib/api/translations'
 import type { TranslationItemResponse, TranslationResponse } from '@/types/api'
 
 type SourceType = 'transcript' | 'revision'
@@ -8,16 +14,21 @@ interface UseTranslationParams {
   sourceType?: SourceType
   sourceEntityId?: string | null
   sessionId?: string | null
+  sourceLanguage?: string
   targetLanguage?: string
   enabled?: boolean
+  /** Return the current source sentences to push when creating or retrying translation. */
+  getSourceItems?: () => TranslationSourceItemInput[]
 }
 
 export function useTranslation({
   sourceType,
   sourceEntityId,
   sessionId,
+  sourceLanguage,
   targetLanguage,
   enabled = true,
+  getSourceItems,
 }: UseTranslationParams) {
   const [translation, setTranslation] = useState<TranslationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -38,11 +49,20 @@ export function useTranslation({
       return data
     } catch (err) {
       if (isMissingTranslationError(err)) {
+        const items = getSourceItems?.()
+        if (!items || items.length === 0) {
+          if (requestSeqRef.current === seq) {
+            setError(err instanceof Error ? err.message : 'Failed to load translation')
+          }
+          return null
+        }
         const created = await createTranslation({
           sourceType,
           sourceEntityId,
           sessionId: sessionId ?? undefined,
+          sourceLanguage,
           targetLanguage,
+          items,
         })
         if (requestSeqRef.current === seq) {
           setTranslation(created)
@@ -54,7 +74,7 @@ export function useTranslation({
       }
       return null
     }
-  }, [canLoad, sourceType, sourceEntityId, sessionId, targetLanguage])
+  }, [canLoad, sourceType, sourceEntityId, sessionId, sourceLanguage, targetLanguage, getSourceItems])
 
   const retry = useCallback(async () => {
     if (!canLoad || !sourceType || !sourceEntityId) return null
@@ -62,11 +82,17 @@ export function useTranslation({
     requestSeqRef.current = seq
     setError(null)
     try {
+      const items = getSourceItems?.()
+      if (!items || items.length === 0) {
+        throw new Error('No source items available for translation')
+      }
       const data = await createTranslation({
         sourceType,
         sourceEntityId,
         sessionId: sessionId ?? undefined,
+        sourceLanguage,
         targetLanguage,
+        items,
         force: true,
       })
       if (requestSeqRef.current === seq) {
@@ -79,9 +105,9 @@ export function useTranslation({
       }
       return null
     }
-  }, [canLoad, sourceType, sourceEntityId, sessionId, targetLanguage])
+  }, [canLoad, sourceType, sourceEntityId, sessionId, sourceLanguage, targetLanguage, getSourceItems])
 
-  const translateItem = useCallback(async (sourceItemKey: string) => {
+  const translateItem = useCallback(async (item: TranslationSourceItemInput) => {
     if (!canLoad || !sourceType || !sourceEntityId) return null
     const seq = requestSeqRef.current + 1
     requestSeqRef.current = seq
@@ -90,9 +116,10 @@ export function useTranslation({
       const data = await translateTranslationItem({
         sourceType,
         sourceEntityId,
-        sourceItemKey,
         sessionId: sessionId ?? undefined,
+        sourceLanguage,
         targetLanguage,
+        item,
       })
       if (requestSeqRef.current === seq) {
         setTranslation(data)
@@ -104,7 +131,7 @@ export function useTranslation({
       }
       return null
     }
-  }, [canLoad, sourceType, sourceEntityId, sessionId, targetLanguage])
+  }, [canLoad, sourceType, sourceEntityId, sessionId, sourceLanguage, targetLanguage])
 
   useEffect(() => {
     if (!canLoad) {
@@ -141,14 +168,12 @@ export function useTranslation({
   const hasStuckItems = !!translation
     && !isTranslating
     && translation.items.some((item) => item.status_name === 'pending' || item.status_name === 'generating')
-  const needsUpdate = !!translation && translation.stale_count > 0
 
   return {
     translation,
     itemsByKey,
     isTranslating,
     hasStuckItems,
-    needsUpdate,
     error,
     reload: load,
     retry,

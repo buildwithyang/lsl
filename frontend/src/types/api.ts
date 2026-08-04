@@ -402,7 +402,6 @@ export interface TranslationItemResponse {
   start_time?: number | null
   end_time?: number | null
   source_text: string
-  source_text_hash: string
   translated_text?: string | null
   status: number
   status_name: string
@@ -456,7 +455,6 @@ export interface TranslationResponse {
   status_name: string
   item_count: number
   completed_count: number
-  stale_count: number
   error_code?: string | null
   error_message?: string | null
   created_at: string

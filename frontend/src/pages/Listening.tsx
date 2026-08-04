@@ -143,20 +143,17 @@ function MobileSubtitleCard({
 function TranslationModeControls({
   mode,
   isTranslating,
-  needsUpdate,
   failed,
   onModeChange,
   onRetry,
 }: {
   mode: ListeningTextMode;
   isTranslating?: boolean;
-  needsUpdate?: boolean;
   failed?: boolean;
   onModeChange: (mode: ListeningTextMode) => void;
   onRetry: () => void;
 }) {
   const { t } = useI18n();
-  const showTranslationAction = isTranslating || needsUpdate || failed;
 
   return (
     <div className="inline-flex items-center gap-2">
@@ -186,14 +183,11 @@ function TranslationModeControls({
           </Tooltip>
         ))}
       </div>
-      {showTranslationAction && (
-        <TranslationButton
-          isTranslating={isTranslating}
-          needsUpdate={needsUpdate}
-          failed={failed}
-          onClick={onRetry}
-        />
-      )}
+      <TranslationButton
+        isTranslating={isTranslating}
+        failed={failed}
+        onClick={onRetry}
+      />
     </div>
   );
 }
@@ -231,6 +225,16 @@ export function Listening() {
     sessionId: id,
     targetLanguage: language,
     enabled: !!revisionId && revision.length > 0,
+    getSourceItems: useCallback(() => {
+      return revision.map((item, index) => ({
+        source_item_key: item.id,
+        source_seq: index,
+        speaker: item.speaker,
+        start_time: item.startTime,
+        end_time: item.endTime,
+        source_text: item.fullText,
+      }))
+    }, [revision]),
   });
 
   useEffect(() => {
@@ -496,7 +500,6 @@ export function Listening() {
           <TranslationModeControls
             mode={translationMode}
             isTranslating={revisionTranslation.isTranslating}
-            needsUpdate={revisionTranslation.needsUpdate}
             failed={revisionTranslation.translation?.status_name === 'failed' || revisionTranslation.hasStuckItems}
             onModeChange={setTranslationMode}
             onRetry={() => void revisionTranslation.retry()}
@@ -510,7 +513,6 @@ export function Listening() {
         <TranslationModeControls
           mode={translationMode}
           isTranslating={revisionTranslation.isTranslating}
-          needsUpdate={revisionTranslation.needsUpdate}
           failed={revisionTranslation.translation?.status_name === 'failed' || revisionTranslation.hasStuckItems}
           onModeChange={setTranslationMode}
           onRetry={() => void revisionTranslation.retry()}

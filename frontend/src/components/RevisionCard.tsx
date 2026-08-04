@@ -104,9 +104,8 @@ export function RevisionCard({
             active={shouldShowTranslation}
             isTranslating={isTranslationGenerating}
             failed={isTranslationFailed}
-            needsUpdate={translationStale}
             onClick={() => {
-              if (isTranslationFailed || translationStale) {
+              if (isTranslationFailed) {
                 onRetryTranslation?.();
                 return;
               }

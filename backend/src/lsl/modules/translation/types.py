@@ -19,7 +19,6 @@ class TranslationItemStatus(IntEnum):
     GENERATING = 1
     COMPLETED = 2
     FAILED = 3
-    STALE = 4
 
 
 def translation_status_to_name(status_code: int) -> str:
@@ -39,7 +38,6 @@ def translation_item_status_to_name(status_code: int) -> str:
         int(TranslationItemStatus.GENERATING): "generating",
         int(TranslationItemStatus.COMPLETED): "completed",
         int(TranslationItemStatus.FAILED): "failed",
-        int(TranslationItemStatus.STALE): "stale",
     }
     return mapping.get(int(status_code), "unknown")
 
@@ -53,17 +51,13 @@ class TranslationSourceItem(BaseModel):
     source_text: str
 
 
-class TranslationRequestItem(TranslationSourceItem):
-    source_text_hash: str
-
-
 class TranslationGenerateRequest(BaseModel):
     translation_id: str
     source_type: str
     source_entity_id: str
     source_language: str | None = None
     target_language: str = "zh-CN"
-    items: list[TranslationRequestItem] = Field(default_factory=list)
+    items: list[TranslationSourceItem] = Field(default_factory=list)
 
 
 class TranslationSuggestion(BaseModel):

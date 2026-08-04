@@ -340,7 +340,6 @@ CREATE TABLE IF NOT EXISTS public.translation_translations (
     x_status          SMALLINT NOT NULL DEFAULT 0,                -- 0 pending, 1 generating, 2 completed, 3 failed, 4 partial.
     item_count        INTEGER NOT NULL DEFAULT 0,                 -- Total translation item count.
     completed_count   INTEGER NOT NULL DEFAULT 0,                 -- Completed item count.
-    stale_count       INTEGER NOT NULL DEFAULT 0,                 -- Items whose source text changed.
     error_code        VARCHAR(64),                                -- Stable failure code.
     error_message     TEXT,                                       -- Failure detail.
     raw_result_json   TEXT,                                       -- Lightweight provider result JSON.
@@ -365,10 +364,9 @@ CREATE TABLE IF NOT EXISTS public.translation_items (
     speaker           VARCHAR(64),                                -- Speaker label.
     start_time        INTEGER,                                    -- Source start time in milliseconds.
     end_time          INTEGER,                                    -- Source end time in milliseconds.
-    source_text       TEXT NOT NULL,                              -- Source text used for this translation.
-    source_text_hash  VARCHAR(64) NOT NULL,                       -- Hash for stale detection.
+    source_text       TEXT NOT NULL,                              -- Source text used for this translation (pushed by the client).
     translated_text   TEXT,                                       -- Translated text.
-    x_status          SMALLINT NOT NULL DEFAULT 0,                -- 0 pending, 1 generating, 2 completed, 3 failed, 4 stale.
+    x_status          SMALLINT NOT NULL DEFAULT 0,                -- 0 pending, 1 generating, 2 completed, 3 failed.
     error_code        VARCHAR(64),                                -- Stable failure code.
     error_message     TEXT,                                       -- Failure detail.
     created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Creation timestamp.

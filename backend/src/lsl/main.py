@@ -213,14 +213,10 @@ async def lifespan(app: FastAPI):
         TranslationService(
             repository=translation_repository,
             generator=create_translation_generator(settings),
-            transcript_service=transcript_service,
-            revision_repository=revision_repository,
             job_service=job_service,
             default_target_language=settings.TRANSLATION_DEFAULT_TARGET_LANGUAGE,
         )
         if translation_repository is not None
-        and transcript_service is not None
-        and revision_repository is not None
         and job_service is not None
         else None
     )

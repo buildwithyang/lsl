@@ -5,7 +5,6 @@ import { useI18n } from '@/i18n'
 interface TranslationButtonProps {
   active?: boolean
   isTranslating?: boolean
-  needsUpdate?: boolean
   failed?: boolean
   disabled?: boolean
   onClick: () => void
@@ -15,7 +14,6 @@ interface TranslationButtonProps {
 export function TranslationButton({
   active = false,
   isTranslating = false,
-  needsUpdate = false,
   failed = false,
   disabled = false,
   onClick,
@@ -24,16 +22,14 @@ export function TranslationButton({
   const { t } = useI18n()
   const icon = isTranslating
     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-    : needsUpdate || failed
+    : failed
       ? <RefreshCw className="h-3.5 w-3.5" />
       : <Languages className="h-3.5 w-3.5" />
   const label = isTranslating
     ? t('translation.translating')
     : failed
       ? t('translation.retry')
-      : needsUpdate
-        ? t('translation.update')
-        : t('translation.short')
+      : t('translation.short')
 
   return (
     <button
