@@ -76,3 +76,9 @@ Thumbs.db
 .env.*.local
 
 *.sqlite3
+
+# =========================
+# graphify 输出
+# =========================
+/graphify-out/
+/graphify-out/**
