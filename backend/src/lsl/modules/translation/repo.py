@@ -136,8 +136,6 @@ class TranslationRepository:
                                 source_item_key=source_item.source_item_key,
                                 source_seq=source_item.source_seq,
                                 speaker=source_item.speaker,
-                                start_time=source_item.start_time,
-                                end_time=source_item.end_time,
                                 source_text=source_item.source_text,
                                 status=int(TranslationItemStatus.PENDING),
                             )
@@ -147,8 +145,6 @@ class TranslationRepository:
                     changed = (item.source_text or "").strip() != (source_item.source_text or "").strip()
                     item.source_seq = source_item.source_seq
                     item.speaker = source_item.speaker
-                    item.start_time = source_item.start_time
-                    item.end_time = source_item.end_time
                     item.source_text = source_item.source_text
                     if changed:
                         item.translated_text = None
@@ -374,8 +370,6 @@ class TranslationRepository:
                     source_item_key=item.source_item_key,
                     source_seq=item.source_seq,
                     speaker=item.speaker,
-                    start_time=item.start_time,
-                    end_time=item.end_time,
                     source_text=item.source_text,
                     translated_text=item.translated_text,
                     status=int(item.status),

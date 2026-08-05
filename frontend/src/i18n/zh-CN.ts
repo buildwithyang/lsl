@@ -267,6 +267,8 @@ export const zhCN = {
   'translation.retry': '重试翻译',
   'translation.update': '更新译文',
   'translation.short': '译文',
+  'translation.translateLine': '翻译',
+  'translation.error': '翻译失败',
 
   'listening.loading': '正在加载听力练习...',
   'listening.title': '听力练习',

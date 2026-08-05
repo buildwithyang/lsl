@@ -21,6 +21,7 @@ interface RevisionCardProps {
   showTranslation?: boolean;
   translationStale?: boolean;
   onRetryTranslation?: () => void;
+  isItemTranslating?: boolean;
   showAssessment?: boolean;
 }
 
@@ -61,6 +62,7 @@ export function RevisionCard({
   showTranslation = false,
   translationStale = false,
   onRetryTranslation,
+  isItemTranslating = false,
   showAssessment = true,
 }: RevisionCardProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -85,7 +87,7 @@ export function RevisionCard({
 
   const scoreColor = item.score >= 90 ? 'text-emerald-600' : item.score >= 70 ? 'text-amber-600' : 'text-red-500';
   const scoreBg = item.score >= 90 ? 'bg-emerald-50' : item.score >= 70 ? 'bg-amber-50' : 'bg-red-50';
-  const isTranslationGenerating = translationStatus === 'pending' || translationStatus === 'generating';
+  const isTranslationGenerating = isItemTranslating || translationStatus === 'pending' || translationStatus === 'generating';
   const isTranslationFailed = translationStatus === 'failed';
   const shouldShowTranslation = showTranslation || showItemTranslation;
 
@@ -107,6 +109,12 @@ export function RevisionCard({
             onClick={() => {
               if (isTranslationFailed) {
                 onRetryTranslation?.();
+                return;
+              }
+              // Not translated yet: translate just this one sentence on demand.
+              if (!translationText) {
+                onRetryTranslation?.();
+                setShowItemTranslation(true);
                 return;
               }
               setShowItemTranslation((current) => !current);

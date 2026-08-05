@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  createTranslation,
   getTranslation,
   isMissingTranslationError,
   translateTranslationItem,
@@ -17,8 +16,6 @@ interface UseTranslationParams {
   sourceLanguage?: string
   targetLanguage?: string
   enabled?: boolean
-  /** Return the current source sentences to push when creating or retrying translation. */
-  getSourceItems?: () => TranslationSourceItemInput[]
 }
 
 export function useTranslation({
@@ -28,9 +25,9 @@ export function useTranslation({
   sourceLanguage,
   targetLanguage,
   enabled = true,
-  getSourceItems,
 }: UseTranslationParams) {
   const [translation, setTranslation] = useState<TranslationResponse | null>(null)
+  const [translatingKeys, setTranslatingKeys] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState<string | null>(null)
   const requestSeqRef = useRef(0)
 
@@ -48,70 +45,32 @@ export function useTranslation({
       }
       return data
     } catch (err) {
+      // Not translated yet is a normal empty state, not an error. Sentences are translated
+      // on demand one at a time via translateItem — we never batch-translate on load.
       if (isMissingTranslationError(err)) {
-        const items = getSourceItems?.()
-        if (!items || items.length === 0) {
-          if (requestSeqRef.current === seq) {
-            setError(err instanceof Error ? err.message : 'Failed to load translation')
-          }
-          return null
-        }
-        const created = await createTranslation({
-          sourceType,
-          sourceEntityId,
-          sessionId: sessionId ?? undefined,
-          sourceLanguage,
-          targetLanguage,
-          items,
-        })
         if (requestSeqRef.current === seq) {
-          setTranslation(created)
+          setTranslation(null)
         }
-        return created
+        return null
       }
       if (requestSeqRef.current === seq) {
         setError(err instanceof Error ? err.message : 'Failed to load translation')
       }
       return null
     }
-  }, [canLoad, sourceType, sourceEntityId, sessionId, sourceLanguage, targetLanguage, getSourceItems])
-
-  const retry = useCallback(async () => {
-    if (!canLoad || !sourceType || !sourceEntityId) return null
-    const seq = requestSeqRef.current + 1
-    requestSeqRef.current = seq
-    setError(null)
-    try {
-      const items = getSourceItems?.()
-      if (!items || items.length === 0) {
-        throw new Error('No source items available for translation')
-      }
-      const data = await createTranslation({
-        sourceType,
-        sourceEntityId,
-        sessionId: sessionId ?? undefined,
-        sourceLanguage,
-        targetLanguage,
-        items,
-        force: true,
-      })
-      if (requestSeqRef.current === seq) {
-        setTranslation(data)
-      }
-      return data
-    } catch (err) {
-      if (requestSeqRef.current === seq) {
-        setError(err instanceof Error ? err.message : 'Failed to start translation')
-      }
-      return null
-    }
-  }, [canLoad, sourceType, sourceEntityId, sessionId, sourceLanguage, targetLanguage, getSourceItems])
+  }, [canLoad, sourceType, sourceEntityId, targetLanguage])
 
   const translateItem = useCallback(async (item: TranslationSourceItemInput) => {
     if (!canLoad || !sourceType || !sourceEntityId) return null
+    const key = item.source_item_key
     const seq = requestSeqRef.current + 1
     requestSeqRef.current = seq
     setError(null)
+    setTranslatingKeys((prev) => {
+      const next = new Set(prev)
+      next.add(key)
+      return next
+    })
     try {
       const data = await translateTranslationItem({
         sourceType,
@@ -122,7 +81,16 @@ export function useTranslation({
         item,
       })
       if (requestSeqRef.current === seq) {
-        setTranslation(data)
+        // Merge the returned item(s) into current state so concurrent single-sentence
+        // translations don't clobber each other.
+        setTranslation((prev) => {
+          if (!prev) return data
+          const byKey = new Map(prev.items.map((existing) => [existing.source_item_key, existing]))
+          for (const next of data.items) {
+            byKey.set(next.source_item_key, next)
+          }
+          return { ...data, items: Array.from(byKey.values()) }
+        })
       }
       return data
     } catch (err) {
@@ -130,6 +98,13 @@ export function useTranslation({
         setError(err instanceof Error ? err.message : 'Failed to translate item')
       }
       return null
+    } finally {
+      setTranslatingKeys((prev) => {
+        if (!prev.has(key)) return prev
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
     }
   }, [canLoad, sourceType, sourceEntityId, sessionId, sourceLanguage, targetLanguage])
 
@@ -137,6 +112,7 @@ export function useTranslation({
     if (!canLoad) {
       requestSeqRef.current += 1
       setTranslation(null)
+      setTranslatingKeys(new Set())
       setError(null)
       return
     }
@@ -172,11 +148,11 @@ export function useTranslation({
   return {
     translation,
     itemsByKey,
+    translatingKeys,
     isTranslating,
     hasStuckItems,
     error,
     reload: load,
-    retry,
     translateItem,
   }
 }

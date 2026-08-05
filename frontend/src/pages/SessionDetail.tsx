@@ -16,8 +16,7 @@ import { getTranscript } from '@/lib/api/transcripts';
 import { getTtsSynthesis } from '@/lib/api/tts';
 import { applyTtsSynthesis, mapSessionItem, mapTranscript } from '@/lib/domain';
 import { useTranslation } from '@/hooks/useTranslation';
-import { TranslationButton } from '@/components/translation/TranslationButton';
-import { TranslationLine } from '@/components/translation/TranslationLine';
+import { InlineTranslationToggle } from '@/components/translation/InlineTranslationToggle';
 import { useI18n } from '@/i18n';
 
 export function SessionDetail() {
@@ -27,7 +26,6 @@ export function SessionDetail() {
   const [notFound, setNotFound] = useState(false);
   const [activeTranscriptIndex, setActiveTranscriptIndex] = useState<number | null>(null);
   const [seekRequest, setSeekRequest] = useState<{ time: number; requestId: number } | null>(null);
-  const [showTranslation, setShowTranslation] = useState(false);
   const [currentTranscriptId, setCurrentTranscriptId] = useState<string | null>(null);
   const [isRetryingTranscription, setIsRetryingTranscription] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -42,16 +40,6 @@ export function SessionDetail() {
     sourceLanguage: session?.targetLanguage,
     targetLanguage: language,
     enabled: !!currentTranscriptId && !!session?.transcript && session.transcript.length > 0,
-    getSourceItems: useCallback(() => {
-      return (session?.transcript || []).map((item, index) => ({
-        source_item_key: item.id,
-        source_seq: index,
-        speaker: item.speaker,
-        start_time: item.startTime,
-        end_time: item.endTime,
-        source_text: item.text,
-      }))
-    }, [session?.transcript]),
   });
 
   useEffect(() => {
@@ -119,7 +107,6 @@ export function SessionDetail() {
 
     setIsRetryingTranscription(true);
     setRetryError(null);
-    setShowTranslation(false);
     setActiveTranscriptIndex(null);
 
     try {
@@ -250,23 +237,14 @@ export function SessionDetail() {
 
       {transcript && transcript.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-slate-100">
             <h3 className="text-[14px] font-bold text-slate-800">{t('session.transcript')}</h3>
-            {session.transcript && (
-              <TranslationButton
-                active={showTranslation}
-                isTranslating={transcriptTranslation.isTranslating}
-                failed={transcriptTranslation.translation?.status_name === 'failed' || transcriptTranslation.hasStuckItems}
-                onClick={() => {
-                  if (transcriptTranslation.translation?.status_name === 'failed' || transcriptTranslation.hasStuckItems) {
-                    void transcriptTranslation.retry();
-                    return;
-                  }
-                  setShowTranslation((current) => !current);
-                }}
-              />
-            )}
           </div>
+          {transcriptTranslation.error && (
+            <div className="px-5 py-2 border-b border-red-100 bg-red-50/60 text-[12px] text-red-600">
+              {t('translation.error')}: {transcriptTranslation.error}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -317,8 +295,18 @@ export function SessionDetail() {
                         ) : (
                           'text' in item ? item.text : item.content
                         )}
-                        {showTranslation && 'text' in item && (
-                          <TranslationLine text={transcriptTranslation.itemsByKey.get(item.id)?.translated_text} />
+                        {'text' in item && (
+                          <InlineTranslationToggle
+                            text={transcriptTranslation.itemsByKey.get(item.id)?.translated_text}
+                            translating={transcriptTranslation.translatingKeys.has(item.id)}
+                            failed={transcriptTranslation.itemsByKey.get(item.id)?.status_name === 'failed'}
+                            onTranslate={() => void transcriptTranslation.translateItem({
+                              source_item_key: item.id,
+                              source_seq: index,
+                              speaker: item.speaker,
+                              source_text: item.text,
+                            })}
+                          />
                         )}
                       </td>
                     </tr>

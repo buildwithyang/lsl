@@ -68,8 +68,6 @@ class TranslationItemModel(Base):
     source_item_key: Mapped[str] = mapped_column(String(128), nullable=False)
     source_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
     speaker: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    start_time: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    end_time: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_text: Mapped[str] = mapped_column(Text, nullable=False)
     translated_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[int] = mapped_column("x_status", SmallInteger, nullable=False, server_default=text("0"))

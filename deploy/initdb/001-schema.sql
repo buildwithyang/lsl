@@ -362,8 +362,6 @@ CREATE TABLE IF NOT EXISTS public.translation_items (
     source_item_key   VARCHAR(128) NOT NULL,                      -- Source item id or transcript seq.
     source_seq        INTEGER,                                    -- Sort key within the source.
     speaker           VARCHAR(64),                                -- Speaker label.
-    start_time        INTEGER,                                    -- Source start time in milliseconds.
-    end_time          INTEGER,                                    -- Source end time in milliseconds.
     source_text       TEXT NOT NULL,                              -- Source text used for this translation (pushed by the client).
     translated_text   TEXT,                                       -- Translated text.
     x_status          SMALLINT NOT NULL DEFAULT 0,                -- 0 pending, 1 generating, 2 completed, 3 failed.

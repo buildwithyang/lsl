@@ -46,8 +46,6 @@ class TranslationSourceItem(BaseModel):
     source_item_key: str
     source_seq: int | None = None
     speaker: str | None = None
-    start_time: int | None = None
-    end_time: int | None = None
     source_text: str
 
 

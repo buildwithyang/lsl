@@ -22,8 +22,7 @@ import {
 } from '@/lib/domain';
 import { getVoiceForSpeaker } from '@/lib/voice';
 import { useTranslation } from '@/hooks/useTranslation';
-import { TranslationButton } from '@/components/translation/TranslationButton';
-import { TranslationLine } from '@/components/translation/TranslationLine';
+import { InlineTranslate } from '@/components/translation/InlineTranslate';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +59,7 @@ function getSentenceHint(content: string) {
 }
 
 function MobileSubtitleCard({
-  item, index, isActive, voice, onClick, translationText, mode,
+  item, index, isActive, voice, onClick, translationText, translating, translationFailed, onTranslate, mode,
 }: {
   item: RevisionItem;
   index: number;
@@ -68,6 +67,9 @@ function MobileSubtitleCard({
   voice?: TtsSpeakerItem;
   onClick: (time: number) => void;
   translationText?: string | null;
+  translating?: boolean;
+  translationFailed?: boolean;
+  onTranslate?: () => void;
   mode: ListeningTextMode;
 }) {
   const parsed = parseCueText(item.fullText);
@@ -131,7 +133,15 @@ function MobileSubtitleCard({
             )}>
               {displayContent}
             </p>
-            {isBilingual && <TranslationLine text={translationText} className="text-[12px]" />}
+            {isBilingual && (
+              <InlineTranslate
+                text={translationText}
+                translating={translating}
+                failed={translationFailed}
+                onTranslate={() => onTranslate?.()}
+                lineClassName="text-[12px]"
+              />
+            )}
           </div>
         </div>
       </div>
@@ -142,52 +152,39 @@ function MobileSubtitleCard({
 
 function TranslationModeControls({
   mode,
-  isTranslating,
-  failed,
   onModeChange,
-  onRetry,
 }: {
   mode: ListeningTextMode;
-  isTranslating?: boolean;
-  failed?: boolean;
   onModeChange: (mode: ListeningTextMode) => void;
-  onRetry: () => void;
 }) {
   const { t } = useI18n();
 
   return (
-    <div className="inline-flex items-center gap-2">
-      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-        {[
-          { value: 'hint', label: t('listening.mode.hint'), tip: t('listening.mode.hintTip') },
-          { value: 'original', label: t('listening.mode.original'), tip: t('listening.mode.originalTip') },
-          { value: 'bilingual', label: t('listening.mode.bilingual'), tip: t('listening.mode.bilingualTip') },
-        ].map((item) => (
-          <Tooltip key={item.value}>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => onModeChange(item.value as ListeningTextMode)}
-                aria-label={`${item.label}: ${item.tip}`}
-                className={cn(
-                  'h-7 rounded-md px-2.5 text-[11px] font-semibold transition-colors',
-                  mode === item.value ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                {item.label}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>
-              {item.tip}
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-      <TranslationButton
-        isTranslating={isTranslating}
-        failed={failed}
-        onClick={onRetry}
-      />
+    <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+      {[
+        { value: 'hint', label: t('listening.mode.hint'), tip: t('listening.mode.hintTip') },
+        { value: 'original', label: t('listening.mode.original'), tip: t('listening.mode.originalTip') },
+        { value: 'bilingual', label: t('listening.mode.bilingual'), tip: t('listening.mode.bilingualTip') },
+      ].map((item) => (
+        <Tooltip key={item.value}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => onModeChange(item.value as ListeningTextMode)}
+              aria-label={`${item.label}: ${item.tip}`}
+              className={cn(
+                'h-7 rounded-md px-2.5 text-[11px] font-semibold transition-colors',
+                mode === item.value ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              {item.label}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={6}>
+            {item.tip}
+          </TooltipContent>
+        </Tooltip>
+      ))}
     </div>
   );
 }
@@ -225,16 +222,6 @@ export function Listening() {
     sessionId: id,
     targetLanguage: language,
     enabled: !!revisionId && revision.length > 0,
-    getSourceItems: useCallback(() => {
-      return revision.map((item, index) => ({
-        source_item_key: item.id,
-        source_seq: index,
-        speaker: item.speaker,
-        start_time: item.startTime,
-        end_time: item.endTime,
-        source_text: item.fullText,
-      }))
-    }, [revision]),
   });
 
   useEffect(() => {
@@ -499,10 +486,7 @@ export function Listening() {
           </div>
           <TranslationModeControls
             mode={translationMode}
-            isTranslating={revisionTranslation.isTranslating}
-            failed={revisionTranslation.translation?.status_name === 'failed' || revisionTranslation.hasStuckItems}
             onModeChange={setTranslationMode}
-            onRetry={() => void revisionTranslation.retry()}
           />
         </div>
       </div>
@@ -512,10 +496,7 @@ export function Listening() {
         <h1 className="text-[16px] font-bold text-slate-800">{t('listening.mobileTitle')}</h1>
         <TranslationModeControls
           mode={translationMode}
-          isTranslating={revisionTranslation.isTranslating}
-          failed={revisionTranslation.translation?.status_name === 'failed' || revisionTranslation.hasStuckItems}
           onModeChange={setTranslationMode}
-          onRetry={() => void revisionTranslation.retry()}
         />
       </div>
 
@@ -530,6 +511,14 @@ export function Listening() {
             voice={getVoiceForSpeaker(item.speaker, speakerMappings, voiceList)}
             onClick={handleSentenceClick}
             translationText={revisionTranslation.itemsByKey.get(item.id)?.translated_text}
+            translating={revisionTranslation.translatingKeys.has(item.id)}
+            translationFailed={revisionTranslation.itemsByKey.get(item.id)?.status_name === 'failed'}
+            onTranslate={() => void revisionTranslation.translateItem({
+              source_item_key: item.id,
+              source_seq: index,
+              speaker: item.speaker,
+              source_text: item.fullText,
+            })}
             mode={translationMode}
           />
         ))}

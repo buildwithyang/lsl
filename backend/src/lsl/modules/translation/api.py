@@ -21,8 +21,6 @@ def _to_source_item(payload: TranslationSourceItemPayload) -> TranslationSourceI
         source_item_key=payload.source_item_key,
         source_seq=payload.source_seq,
         speaker=payload.speaker,
-        start_time=payload.start_time,
-        end_time=payload.end_time,
         source_text=payload.source_text,
     )
 

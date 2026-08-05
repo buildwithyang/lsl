@@ -11,8 +11,6 @@ export interface TranslationSourceItemInput {
   source_item_key: string
   source_seq?: number | null
   speaker?: string | null
-  start_time?: number | null
-  end_time?: number | null
   source_text: string
 }
 

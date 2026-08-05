@@ -267,6 +267,8 @@ export const en = {
   'translation.retry': 'Retry translation',
   'translation.update': 'Update translation',
   'translation.short': 'Translation',
+  'translation.translateLine': 'Translate',
+  'translation.error': 'Translation failed',
 
   'listening.loading': 'Loading listening practice...',
   'listening.title': 'Listening Practice',

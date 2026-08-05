@@ -35,8 +35,6 @@ def _items(*texts: str) -> list[TranslationSourceItem]:
             source_item_key=str(index),
             source_seq=index,
             speaker="A",
-            start_time=index * 1000,
-            end_time=(index + 1) * 1000,
             source_text=text,
         )
         for index, text in enumerate(texts)
@@ -213,8 +211,6 @@ def test_pushing_changed_text_resets_item_to_pending() -> None:
                 source_item_key="0",
                 source_seq=0,
                 speaker="A",
-                start_time=0,
-                end_time=1000,
                 source_text="hello there again",
             )
         ],
@@ -235,8 +231,6 @@ def test_translate_single_item_runs_without_job() -> None:
             source_item_key="1",
             source_seq=1,
             speaker="B",
-            start_time=1000,
-            end_time=2000,
             source_text="nice to meet you",
         ),
         target_language="zh-CN",

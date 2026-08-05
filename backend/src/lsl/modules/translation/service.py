@@ -250,8 +250,6 @@ class TranslationService:
             source_item_key=item.source_item_key,
             source_seq=item.source_seq,
             speaker=item.speaker,
-            start_time=item.start_time,
-            end_time=item.end_time,
             source_text=item.source_text,
         )
 

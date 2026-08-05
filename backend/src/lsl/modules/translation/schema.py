@@ -20,8 +20,6 @@ class TranslationSourceItemPayload(BaseModel):
     source_item_key: str = Field(..., min_length=1, max_length=128)
     source_seq: int | None = None
     speaker: str | None = Field(default=None, max_length=64)
-    start_time: int | None = None
-    end_time: int | None = None
     source_text: str = Field(..., min_length=1)
 
     @field_validator("source_item_key")
@@ -98,8 +96,6 @@ class TranslationItemData(BaseModel):
     source_item_key: str
     source_seq: int | None = None
     speaker: str | None = None
-    start_time: int | None = None
-    end_time: int | None = None
     source_text: str
     translated_text: str | None = None
     status: int
