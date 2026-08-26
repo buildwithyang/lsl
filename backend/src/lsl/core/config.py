@@ -101,16 +101,14 @@ class Settings:
 
     # ASR provider。本地可用 noop/fake；真实识别使用 volc。
     ASR_PROVIDER: str = "noop"
-    # 火山 ASR App Key。
-    VOLC_APP_KEY: str = ""
-    # 火山 ASR Access Key。
-    VOLC_ACCESS_KEY: str = ""
-    # 火山 ASR resource id。
-    VOLC_RESOURCE_ID: str = "volc.bigasr.auc"
+    # 火山 ASR API Key；从豆包语音控制台的 API Key 管理页面获取。
+    VOLC_API_KEY: str = ""
+    # 火山 ASR resource id；使用录音文件识别模型 2.0。
+    VOLC_RESOURCE_ID: str = "volc.seedasr.auc"
     # 火山 ASR submit 接口地址。
-    VOLC_SUBMIT_URL: str = "https://openspeech-direct.zijieapi.com/api/v3/auc/bigmodel/submit"
+    VOLC_SUBMIT_URL: str = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit"
     # 火山 ASR query 接口地址。
-    VOLC_QUERY_URL: str = "https://openspeech-direct.zijieapi.com/api/v3/auc/bigmodel/query"
+    VOLC_QUERY_URL: str = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query"
     # 火山 ASR 模型名。
     VOLC_MODEL_NAME: str = "bigmodel"
     # 火山 ASR 请求使用的用户标识。
@@ -325,8 +323,7 @@ class Settings:
             OSS_ACCESS_KEY_ID=os.getenv("OSS_ACCESS_KEY_ID", cls.OSS_ACCESS_KEY_ID).strip(),
             OSS_ACCESS_KEY_SECRET=os.getenv("OSS_ACCESS_KEY_SECRET", cls.OSS_ACCESS_KEY_SECRET).strip(),
             ASR_PROVIDER=os.getenv("ASR_PROVIDER", cls.ASR_PROVIDER).strip().lower() or cls.ASR_PROVIDER,
-            VOLC_APP_KEY=_get_env_str("VOLC_APP_KEY", cls.VOLC_APP_KEY),
-            VOLC_ACCESS_KEY=_get_env_str("VOLC_ACCESS_KEY", cls.VOLC_ACCESS_KEY),
+            VOLC_API_KEY=_get_env_str("VOLC_API_KEY", cls.VOLC_API_KEY),
             VOLC_RESOURCE_ID=_get_env_str("VOLC_RESOURCE_ID", cls.VOLC_RESOURCE_ID),
             VOLC_SUBMIT_URL=_get_env_str("VOLC_SUBMIT_URL", cls.VOLC_SUBMIT_URL),
             VOLC_QUERY_URL=_get_env_str("VOLC_QUERY_URL", cls.VOLC_QUERY_URL),

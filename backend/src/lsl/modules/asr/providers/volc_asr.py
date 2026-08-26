@@ -25,8 +25,7 @@ class VolcAsrProvider:
     _STATUS_PROCESSING = "20000002"
 
     def __init__(self, settings: Settings) -> None:
-        self._app_key = settings.VOLC_APP_KEY
-        self._access_key = settings.VOLC_ACCESS_KEY
+        self._api_key = settings.VOLC_API_KEY
         self._resource_id = settings.VOLC_RESOURCE_ID
         self._submit_url = settings.VOLC_SUBMIT_URL
         self._query_url = settings.VOLC_QUERY_URL
@@ -37,8 +36,7 @@ class VolcAsrProvider:
 
     def submit(self, req: AsrSubmitRequest) -> AsrJobRef:
         headers = {
-            "X-Api-App-Key": self._app_key,
-            "X-Api-Access-Key": self._access_key,
+            "X-Api-Key": self._api_key,
             "X-Api-Resource-Id": self._resource_id,
             "X-Api-Request-Id": req.recognition_id,
             "X-Api-Sequence": "-1",
@@ -92,8 +90,7 @@ class VolcAsrProvider:
 
     def query(self, ref: AsrJobRef) -> AsrQueryResult:
         headers = {
-            "X-Api-App-Key": self._app_key,
-            "X-Api-Access-Key": self._access_key,
+            "X-Api-Key": self._api_key,
             "X-Api-Resource-Id": ref.provider_resource_id or self._resource_id,
             "X-Api-Request-Id": ref.provider_request_id,
             "Content-Type": "application/json",
@@ -158,10 +155,8 @@ class VolcAsrProvider:
         )
 
     def _validate_settings(self) -> None:
-        if not self._app_key:
-            raise ValueError("VOLC_APP_KEY is required when ASR_PROVIDER=volc")
-        if not self._access_key:
-            raise ValueError("VOLC_ACCESS_KEY is required when ASR_PROVIDER=volc")
+        if not self._api_key:
+            raise ValueError("VOLC_API_KEY is required when ASR_PROVIDER=volc")
         if not self._submit_url:
             raise ValueError("VOLC_SUBMIT_URL is required when ASR_PROVIDER=volc")
         if not self._query_url:
@@ -212,9 +207,9 @@ class VolcAsrProvider:
     @staticmethod
     def _safe_headers(headers: dict[str, str]) -> dict[str, str]:
         safe = dict(headers)
-        access_key = safe.get("X-Api-Access-Key")
-        if access_key:
-            safe["X-Api-Access-Key"] = f"{access_key[:4]}***{access_key[-4:]}" if len(access_key) > 8 else "***"
+        api_key = safe.get("X-Api-Key")
+        if api_key:
+            safe["X-Api-Key"] = f"{api_key[:4]}***{api_key[-4:]}" if len(api_key) > 8 else "***"
         return safe
 
     @staticmethod

@@ -167,11 +167,10 @@ OSS_ACCESS_KEY_SECRET=your-access-key-secret
 
 # ASR
 ASR_PROVIDER=volc
-VOLC_APP_KEY=your-volc-app-key
-VOLC_ACCESS_KEY=your-volc-access-key
-VOLC_RESOURCE_ID=volc.bigasr.auc
-VOLC_SUBMIT_URL=https://openspeech-direct.zijieapi.com/api/v3/auc/bigmodel/submit
-VOLC_QUERY_URL=https://openspeech-direct.zijieapi.com/api/v3/auc/bigmodel/query
+VOLC_API_KEY=your-volc-api-key
+VOLC_RESOURCE_ID=volc.seedasr.auc
+VOLC_SUBMIT_URL=https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit
+VOLC_QUERY_URL=https://openspeech.bytedance.com/api/v3/auc/bigmodel/query
 VOLC_MODEL_NAME=bigmodel
 VOLC_UID=lsl_user
 VOLC_HTTP_TIMEOUT=60

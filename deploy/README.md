@@ -89,8 +89,7 @@ OSS_ACCESS_KEY_SECRET=your-access-key-secret
 
 ```env
 ASR_PROVIDER=volc
-VOLC_APP_KEY=your-volc-app-key
-VOLC_ACCESS_KEY=your-volc-access-key
+VOLC_API_KEY=your-volc-api-key
 ```
 
 配置真实 Revision、AI Script 和 Translation：
