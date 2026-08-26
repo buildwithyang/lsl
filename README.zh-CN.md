@@ -137,19 +137,19 @@ LSL 的宗旨是：学习语言应该是 `listening -> speak -> listening`。先
 
 ### 1. 安装依赖
 
-当前项目使用 `uv pip install` 安装 Python 依赖。后端原型至少需要：
+根目录的 `pyproject.toml` 是后端依赖的唯一来源，`uv.lock` 锁定本地和 Docker 使用的具体版本：
 
 ```bash
-uv pip install fastapi uvicorn pydantic sqlalchemy python-dotenv requests httpx openai json-repair redis alibabacloud-oss-v2 trafilatura
+uv sync --locked
 ```
 
 说明：
 
 - `json-repair` 用于修复 revision 流程里大模型偶发返回的非严格 JSON。
 - 本地开发默认已经切到 `SQLite`，不再要求先起 `PostgreSQL`。
-- 如果你仍然要接 `PostgreSQL`，再额外安装 `psycopg[binary]` 和 `psycopg-pool`。
-- 如果本地已经有 `uv` 管理的虚拟环境，直接在对应环境里执行即可。
+- 部署使用同一份锁文件，因此 PostgreSQL 运行时依赖也已包含在正式清单里。
 - `trafilatura` 用于把任意 HTML 网页抽取出干净的正文，是播客功能的基础依赖。
+- 新增或更新后端依赖使用 `uv add <package>`，不要再维护独立的 requirements 文件。
 
 ### 2. 配置 `.env`
 

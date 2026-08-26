@@ -18,7 +18,6 @@ deploy/
 ├── .env.example
 ├── app.env.example
 ├── backend.Dockerfile
-├── backend.requirements.txt
 ├── docker-compose.yml
 ├── initdb/
 │   └── 001-schema.sql
@@ -26,6 +25,8 @@ deploy/
 │   └── default.conf
 └── web.Dockerfile
 ```
+
+后端镜像使用仓库根目录的 `pyproject.toml` 和 `uv.lock` 安装依赖，与本地 `uv sync` 共用同一来源。
 
 ## 1. 准备服务器
 

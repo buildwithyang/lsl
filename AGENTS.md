@@ -33,4 +33,5 @@
 - 不要把密钥、token、完整外部响应中的敏感字段写进日志。
 - 表结构默认值要同时兼容 `SQLite` 和 `PostgreSQL`。
 - 新模块在写代码的同时补一份模块 `README.md`。
+- 后端依赖以根目录 `pyproject.toml` 和 `uv.lock` 为唯一来源；本地与 Docker 不单独维护 requirements 文件。
 - 提交保持聚焦，只纳入本次任务相关的改动。

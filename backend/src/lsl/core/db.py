@@ -55,7 +55,7 @@ def create_database_resources(settings: Settings) -> DatabaseResources:
             from psycopg_pool import ConnectionPool
         except ImportError as exc:
             raise RuntimeError(
-                "psycopg_pool is required. Run: uv pip install psycopg-pool"
+                "psycopg_pool is required. Run: uv sync --locked"
             ) from exc
 
         connect_pool = ConnectionPool(

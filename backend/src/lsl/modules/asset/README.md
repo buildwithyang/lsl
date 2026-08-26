@@ -53,7 +53,7 @@ backend/src/lsl/
 ### 1. 安装依赖（一次）
 
 ```bash
-uv pip install fastapi uvicorn alibabacloud-oss-v2 python-dotenv sqlalchemy
+uv sync --locked
 ```
 
 ### 2. 配置 `.env`
@@ -75,7 +75,7 @@ DB_POOL_TIMEOUT=30
 - `STORAGE_PROVIDER=oss` 时，`OSS_BUCKET/OSS_ACCESS_KEY_ID/OSS_ACCESS_KEY_SECRET` 必填。
 - `ASSET_BASE_URL` 用于生成读 URL，可替换为 CDN 域名。
 - `DATABASE_URL` 用于 `POST /assets/complete-upload` 入库。
-- 默认本地运行使用 `SQLite`；如果要接 `PostgreSQL`，再把 `DATABASE_URL` 改成 `postgresql://...` 并额外安装 `psycopg`。
+- 默认本地运行使用 `SQLite`；如果要接 `PostgreSQL`，把 `DATABASE_URL` 改成 `postgresql://...`，正式依赖清单已包含 PostgreSQL 驱动。
 
 ### 3. PostgreSQL 手动建表（可选）
 

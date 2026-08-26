@@ -127,19 +127,19 @@ Note: most module design docs are currently written in Chinese.
 
 ### 1. Install dependencies
 
-This project currently uses `uv pip install` for Python dependencies. The backend prototype needs at least:
+The root `pyproject.toml` is the single source of truth for backend dependencies, and `uv.lock` pins the resolved versions used locally and in Docker:
 
 ```bash
-uv pip install fastapi uvicorn pydantic sqlalchemy python-dotenv requests httpx openai json-repair redis alibabacloud-oss-v2 trafilatura
+uv sync --locked
 ```
 
 Notes:
 
 - `json-repair` is used to recover non-strict JSON returned by the revision pipeline.
 - Local development now defaults to `SQLite`, so `PostgreSQL` is no longer required just to start the app.
-- If you still want `PostgreSQL`, install `psycopg[binary]` and `psycopg-pool` as well.
-- If you already have a `uv`-managed virtual environment, run the command inside that environment.
+- PostgreSQL runtime dependencies are included because the same lockfile is used by deployment.
 - `trafilatura` is used to extract main text from arbitrary HTML pages for the podcast feature.
+- Add or update backend dependencies with `uv add <package>`; do not maintain a separate requirements file.
 
 ### 2. Configure `.env`
 
