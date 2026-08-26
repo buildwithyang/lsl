@@ -37,6 +37,7 @@ def _build_repository() -> UserRepository:
 def test_auth_service_builds_authorization_url_with_state_and_pkce() -> None:
     service = AuthService(
         settings=Settings(
+            CASDOOR_ENDPOINT="http://localhost:18000",
             CASDOOR_CLIENT_ID="client-id",
             CASDOOR_CLIENT_SECRET="client-secret",
             CASDOOR_REDIRECT_URI="http://localhost:8000/auth/callback",
